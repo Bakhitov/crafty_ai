@@ -55,17 +55,25 @@ However, for local development, you can also use a file-based approach by enabli
 ```env
 # Whether to use file-based MCP config (default: false)
 FILE_BASED_MCP_CONFIG=true
+# Optional custom path for the config file
+MCP_CONFIG_PATH=.mcp-config.json
 ```
 
-Then, create a `.mcp-config.json` file in the project root and define your servers there. Example:
+Then, create a `.mcp-config.json` file (or the file pointed by `MCP_CONFIG_PATH`) in the project root and define your servers there. Example:
 
 ```jsonc
 // .mcp-config.json
 {
-  "playwright": {
-    "command": "npx",
-    "args": ["@playwright/mcp@latest"]
-  }
+  "servers": [
+    {
+      "id": "custom-mcp-server",
+      "name": "Custom MCP Server",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["./custom-mcp-server/index.ts"],
+      "env": {}
+    }
+  ]
 }
 ```
 

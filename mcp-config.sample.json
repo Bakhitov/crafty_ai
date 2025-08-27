@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "id": "custom-mcp-server",
+      "name": "Custom MCP Server",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["./custom-mcp-server/index.ts"],
+      "env": {}
+    }
+  ]
+}
