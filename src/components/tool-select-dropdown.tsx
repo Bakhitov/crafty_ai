@@ -605,17 +605,19 @@ function McpServerSelector() {
     },
     [],
   );
+  const tLayout = useTranslations("Layout");
+  const tMcp = useTranslations("MCP");
   return (
     <DropdownMenuGroup>
       {!selectedMcpServerList.length ? (
         <div className="text-sm text-muted-foreground w-full h-full flex flex-col items-center justify-center py-6">
-          <div>No MCP servers detected.</div>
+          <div>{tLayout("mcpConfiguration")}</div>
           <Link href="/mcp">
             <Button
               variant={"ghost"}
               className="mt-2 text-primary flex items-center gap-1"
             >
-              Add a server <ChevronRight className="size-4" />
+              {tMcp("addMcpServer")} <ChevronRight className="size-4" />
             </Button>
           </Link>
         </div>

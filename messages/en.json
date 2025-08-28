@@ -5,6 +5,7 @@
     "continue": "Continue",
     "success": "Success",
     "delete": "Delete",
+    "deleted": "Deleted",
     "save": "Save",
     "back": "Back",
     "next": "Next",
@@ -15,6 +16,10 @@
     "edit": "Edit",
     "editAgent": "Edit Agent",
     "search": "Search...",
+    "provider": "Provider",
+    "label": "Label",
+    "saved": "Saved",
+    "select": "Select...",
     "approve": "Approve",
     "reject": "Reject",
     "saving": "Saving...",
@@ -178,7 +183,7 @@
       "createAccount": "Create account"
     },
     "Intro": {
-      "description": "Welcome to better-chatbot. Sign in to experience our AI-powered conversational tools."
+      "description": "Welcome to Crafty AI. Sign in to experience our AI-powered conversational tools."
     }
   },
   "Chat": {
@@ -285,7 +290,17 @@
       "userInstructions": "User Instructions",
       "userInstructionsDescription": "Introduce yourself and get a more personalized response.",
       "mcpInstructions": "MCP Instructions",
-      "mcpInstructionsDescription": "Customize the MCP server instructions."
+      "mcpInstructionsDescription": "Customize the MCP server instructions.",
+      "apiKeys": "API Keys",
+      "apiKeysDescription": "Manage your per-user provider API keys and optional base URL.",
+      "existingKeys": "Existing Keys",
+      "noKeys": "No keys yet",
+      "baseUrlHint": "Optional. Override default provider endpoint."
+    },
+    "MissingKeys": {
+      "title": "Missing API key",
+      "description": "Add your API key in Settings → API Keys, then try again.",
+      "openSettings": "Open Settings"
     }
   },
   "Layout": {
@@ -328,8 +343,9 @@
     "unarchivedChatsDeleted": "Unarchived threads deleted",
     "failedToDeleteAllChats": "Failed to delete all threads",
     "failedToDeleteUnarchivedChats": "Failed to delete unarchived threads",
-    "chatPreferences": "Chat Preferences",
+    "chatPreferences": "Preferences",
     "keyboardShortcuts": "Keyboard Shortcuts",
+    "contacts": "Support contacts",
     "theme": "Theme",
     "signOut": "Sign out",
     "language": "Language",
@@ -382,7 +398,7 @@
     "generateAgentGreeting": "Hello! I'll help you create your own agent. What would you like to create?",
     "generateAgentDetailedGreeting": "Hello! I'll help you create your own agent. What would you like to create? You can write briefly or in detail.",
     "inputPromptHere": "input prompt here...",
-    "agentNamePlaceholder": "better-agent",
+    "agentNamePlaceholder": "crafty-agent",
     "myAgents": "My Agents",
     "sharedAgents": "Shared Agents",
     "noAgents": "No agents yet",
@@ -426,6 +442,7 @@
   "MCP": {
     "marketplace": "Marketplace",
     "addMcpServer": "Add Server",
+    "nameTitle": "Server Name",
     "configureYourMcpServerConnectionSettings": "Configure your MCP server connection settings",
     "mcpConfiguration": "MCP Configuration",
     "nameMustContainOnlyAlphanumericCharactersAndHyphens": "Name must contain only alphanumeric characters (A-Z, a-z, 0-9) and hyphens (-)",

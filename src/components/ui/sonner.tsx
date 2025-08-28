@@ -12,7 +12,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={themeBase as ToasterProps["theme"]}
-      className="toaster group "
+      className="toaster group z-[100000]"
       {...props}
     />
   );

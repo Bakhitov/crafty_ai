@@ -16,8 +16,10 @@ import {
 import {
   MCPInstructionsContent,
   UserInstructionsContent,
+  ApiKeysContent,
 } from "./chat-preferences-content";
 import { UserIcon, X } from "lucide-react";
+import { RiKey2Line } from "react-icons/ri";
 import { Button } from "ui/button";
 import { useTranslations } from "next-intl";
 import { MCPIcon } from "ui/mcp-icon";
@@ -38,6 +40,10 @@ export function ChatPreferencesPopup() {
       {
         label: t("Chat.ChatPreferences.mcpInstructions"),
         icon: <MCPIcon className="w-4 h-4 fill-muted-foreground" />,
+      },
+      {
+        label: t("Chat.ChatPreferences.apiKeys"),
+        icon: <RiKey2Line className="w-5 h-5" />,
       },
     ];
   }, []);
@@ -88,7 +94,7 @@ export function ChatPreferencesPopup() {
           style={{
             userSelect: "text",
           }}
-          className="max-h-[100vh]! w-full h-full border-none rounded-none flex flex-col bg-card overflow-hidden p-4 md:p-6"
+          className="max-h-[90vh]! w-full h-full border-none rounded-none flex flex-col bg-card overflow-hidden p-4 md:p-6"
         >
           <div className="flex items-center justify-end">
             <Button variant="ghost" size="icon" onClick={handleClose}>
@@ -99,7 +105,7 @@ export function ChatPreferencesPopup() {
           <DrawerDescription className="sr-only" />
 
           <div className="flex justify-center">
-            <div className="w-full mt-4 lg:w-5xl lg:mt-14">
+            <div className="w-full mt-4 lg:w-5xl lg:mt-1">
               {/* Mobile: Tabs as horizontal scroll */}
               <div className="md:hidden">
                 <div className="flex gap-2 overflow-x-auto pb-2">
@@ -122,7 +128,7 @@ export function ChatPreferencesPopup() {
 
               <div className="flex flex-1 overflow-hidden">
                 {/* Desktop: Sidebar */}
-                <div className="hidden md:block w-64">
+                <div className="hidden md:block w-80">
                   <nav className="px-4 flex flex-col gap-2">
                     {tabs.map((tabItem, index) => (
                       <button
@@ -150,6 +156,8 @@ export function ChatPreferencesPopup() {
                           <UserInstructionsContent />
                         ) : tab == 1 ? (
                           <MCPInstructionsContent />
+                        ) : tab == 2 ? (
+                          <ApiKeysContent />
                         ) : null}
                       </>
                     )}

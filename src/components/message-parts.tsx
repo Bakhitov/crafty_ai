@@ -98,6 +98,8 @@ interface ToolMessagePartProps {
   addToolResult?: UseChatHelpers<UIMessage>["addToolResult"];
   isError?: boolean;
   setMessages?: UseChatHelpers<UIMessage>["setMessages"];
+  hideTitle?: boolean;
+  alwaysExpanded?: boolean;
 }
 
 const MAX_TEXT_LENGTH = 600;
@@ -718,6 +720,8 @@ export const ToolMessagePart = memo(
     messageId,
     setMessages,
     isManualToolInvocation,
+    hideTitle,
+    alwaysExpanded,
   }: ToolMessagePartProps) => {
     const t = useTranslations("");
 
@@ -897,8 +901,8 @@ export const ToolMessagePart = memo(
     }, [toolName]);
 
     const isExpanded = useMemo(() => {
-      return expanded || result === null || isWorkflowTool;
-    }, [expanded, result, isWorkflowTool]);
+      return !!alwaysExpanded || expanded || result === null || isWorkflowTool;
+    }, [alwaysExpanded, expanded, result, isWorkflowTool]);
 
     const isExecuting = useMemo(() => {
       if (isWorkflowTool)
@@ -914,52 +918,56 @@ export const ToolMessagePart = memo(
           CustomToolComponent
         ) : (
           <div className="flex flex-col fade-in duration-300 animate-in">
-            <div
-              className="flex gap-2 items-center cursor-pointer group/title"
-              onClick={() => setExpanded(!expanded)}
-            >
-              <div className="p-1.5 text-primary bg-input/40 rounded">
-                {isExecuting ? (
-                  <Loader className="size-3.5 animate-spin" />
-                ) : isError ? (
-                  <TriangleAlert className="size-3.5 text-destructive" />
-                ) : isWorkflowTool ? (
-                  <Avatar className="size-3.5">
-                    <AvatarImage
-                      src={
-                        (result as VercelAIWorkflowToolStreamingResult)
-                          .workflowIcon?.value
-                      }
-                    />
-                    <AvatarFallback>
-                      {toolName.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                ) : (
-                  <HammerIcon className="size-3.5" />
+            {!hideTitle && (
+              <div
+                className="flex gap-2 items-center cursor-pointer group/title"
+                onClick={() => {
+                  if (!alwaysExpanded) setExpanded(!expanded);
+                }}
+              >
+                <div className="p-1.5 text-primary bg-input/40 rounded">
+                  {isExecuting ? (
+                    <Loader className="size-3.5 animate-spin" />
+                  ) : isError ? (
+                    <TriangleAlert className="size-3.5 text-destructive" />
+                  ) : isWorkflowTool ? (
+                    <Avatar className="size-3.5">
+                      <AvatarImage
+                        src={
+                          (result as VercelAIWorkflowToolStreamingResult)
+                            .workflowIcon?.value
+                        }
+                      />
+                      <AvatarFallback>
+                        {toolName.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <HammerIcon className="size-3.5" />
+                  )}
+                </div>
+                <span className="font-bold flex items-center gap-2">
+                  {isExecuting ? (
+                    <TextShimmer>{mcpServerName}</TextShimmer>
+                  ) : (
+                    mcpServerName
+                  )}
+                </span>
+                {mcpToolName && (
+                  <>
+                    <ChevronRight className="size-3.5" />
+                    <span className="text-muted-foreground group-hover/title:text-primary transition-colors duration-300">
+                      {mcpToolName}
+                    </span>
+                  </>
                 )}
+                <div className="ml-auto group-hover/title:bg-input p-1.5 rounded transition-colors duration-300">
+                  <ChevronDownIcon
+                    className={cn(isExpanded && "rotate-180", "size-3.5")}
+                  />
+                </div>
               </div>
-              <span className="font-bold flex items-center gap-2">
-                {isExecuting ? (
-                  <TextShimmer>{mcpServerName}</TextShimmer>
-                ) : (
-                  mcpServerName
-                )}
-              </span>
-              {mcpToolName && (
-                <>
-                  <ChevronRight className="size-3.5" />
-                  <span className="text-muted-foreground group-hover/title:text-primary transition-colors duration-300">
-                    {mcpToolName}
-                  </span>
-                </>
-              )}
-              <div className="ml-auto group-hover/title:bg-input p-1.5 rounded transition-colors duration-300">
-                <ChevronDownIcon
-                  className={cn(isExpanded && "rotate-180", "size-3.5")}
-                />
-              </div>
-            </div>
+            )}
             <div className="flex gap-2 py-2">
               <div className="w-7 flex justify-center">
                 <Separator
@@ -968,49 +976,53 @@ export const ToolMessagePart = memo(
                 />
               </div>
               <div className="w-full flex flex-col gap-2">
-                <div
-                  className={cn(
-                    "min-w-0 w-full p-4 rounded-lg bg-card px-4 border text-xs transition-colors fade-300",
-                    !isExpanded && "hover:bg-secondary cursor-pointer",
-                  )}
-                  onClick={() => {
-                    if (!isExpanded) {
-                      setExpanded(true);
-                    }
-                  }}
-                >
-                  <div className="flex items-center">
-                    <h5 className="text-muted-foreground font-medium select-none transition-colors">
-                      Request
-                    </h5>
-                    <div className="flex-1" />
-                    {copiedInput ? (
-                      <Check className="size-3" />
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-3 text-muted-foreground"
-                        onClick={() => copyInput(JSON.stringify(input))}
-                      >
-                        <Copy className="size-3" />
-                      </Button>
-                    )}
-                  </div>
-                  {isExpanded && (
-                    <div className="p-2 max-h-[300px] overflow-y-auto ">
-                      <JsonView data={input} />
+                {isWorkflowTool ? (
+                  <>
+                    <div
+                      className={cn(
+                        "min-w-0 w-full p-4 rounded-lg bg-card px-4 border text-xs transition-colors fade-300",
+                        !isExpanded && "hover:bg-secondary cursor-pointer",
+                      )}
+                      onClick={() => {
+                        if (!isExpanded) {
+                          setExpanded(true);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center">
+                        <h5 className="text-muted-foreground font-medium select-none transition-colors">
+                          Request
+                        </h5>
+                        <div className="flex-1" />
+                        {copiedInput ? (
+                          <Check className="size-3" />
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-3 text-muted-foreground"
+                            onClick={() => copyInput(JSON.stringify(input))}
+                          >
+                            <Copy className="size-3" />
+                          </Button>
+                        )}
+                      </div>
+                      {isExpanded && (
+                        <div className="p-2 max-h-[300px] overflow-y-auto ">
+                          <JsonView data={input} />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                {!result ? null : isWorkflowTool ? (
-                  <WorkflowInvocation
-                    result={result as VercelAIWorkflowToolStreamingResult}
-                  />
+                    {!!result && (
+                      <WorkflowInvocation
+                        result={result as VercelAIWorkflowToolStreamingResult}
+                      />
+                    )}
+                  </>
                 ) : (
                   <div
                     className={cn(
-                      "min-w-0 w-full p-4 rounded-lg bg-card px-4 border text-xs mt-2 transition-colors fade-300",
+                      "min-w-0 w-full p-4 rounded-lg bg-card px-4 border text-xs transition-colors fade-300",
                       !isExpanded && "hover:bg-secondary cursor-pointer",
                     )}
                     onClick={() => {
@@ -1019,10 +1031,8 @@ export const ToolMessagePart = memo(
                       }
                     }}
                   >
-                    <div className="flex items-center">
-                      <h5 className="text-muted-foreground font-medium select-none">
-                        Response
-                      </h5>
+                    <div className="flex items-center gap-1">
+                      <h5 className="text-muted-foreground font-medium select-none"></h5>
                       <div className="flex-1" />
                       {copiedOutput ? (
                         <Check className="size-3" />
@@ -1031,15 +1041,35 @@ export const ToolMessagePart = memo(
                           variant="ghost"
                           size="icon"
                           className="size-3 text-muted-foreground"
-                          onClick={() => copyOutput(JSON.stringify(result))}
+                          onClick={() =>
+                            copyOutput(
+                              JSON.stringify({
+                                request: input,
+                                response: result,
+                              }),
+                            )
+                          }
                         >
                           <Copy className="size-3" />
                         </Button>
                       )}
                     </div>
                     {isExpanded && (
-                      <div className="p-2 max-h-[300px] overflow-y-auto">
-                        <JsonView data={result} />
+                      <div className="p-2 max-h-[300px] overflow-y-auto flex flex-col gap-3">
+                        <div>
+                          <div className="text-muted-foreground font-medium mb-1">
+                            Request
+                          </div>
+                          <JsonView data={input} />
+                        </div>
+                        {!!result && (
+                          <div>
+                            <div className="text-muted-foreground font-medium mb-1">
+                              Response
+                            </div>
+                            <JsonView data={result} />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

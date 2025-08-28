@@ -19,6 +19,223 @@ import { Textarea } from "ui/textarea";
 import { McpServerCustomizationContent } from "./mcp-customization-popup";
 import { MCPServerInfo } from "app-types/mcp";
 import { useMcpList } from "@/hooks/queries/use-mcp-list";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "ui/select";
+import { Card } from "ui/card";
+import { ModelProviderIcon } from "ui/model-provider-icon";
+import { GoTrash } from "react-icons/go";
+
+type ProviderKey =
+  | "openai"
+  | "google"
+  | "anthropic"
+  | "xai"
+  | "openrouter"
+  | "exa";
+
+const PROVIDERS: { id: ProviderKey; name: string }[] = [
+  { id: "openai", name: "OpenAI" },
+  { id: "google", name: "Google" },
+  { id: "anthropic", name: "Anthropic" },
+  { id: "xai", name: "XAI" },
+  { id: "openrouter", name: "OpenRouter" },
+  { id: "exa", name: "Exa" },
+];
+
+export function ApiKeysContent() {
+  const t = useTranslations();
+  const [provider, setProvider] = useState<ProviderKey | "">("");
+  const [label, setLabel] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data, mutate, isLoading } = useSWR<Record<string, any>>(
+    "/api/user/keys",
+    fetcher,
+  );
+
+  const onSave = async () => {
+    setIsSubmitting(true);
+    try {
+      const body: any = { provider, key: apiKey };
+      if (label) body.label = label;
+      if (baseUrl) body.baseUrl = baseUrl;
+      const res = await fetch("/api/user/keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success(t("Common.saved"));
+      setApiKey("");
+      await mutate();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onDelete = async (prov: string, lbl?: string | null) => {
+    try {
+      const res = await fetch("/api/user/keys", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: prov, label: lbl ?? null }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success(t("Common.deleted"));
+      await mutate();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to delete");
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <h3 className="text-xl font-semibold">
+        {t("Chat.ChatPreferences.apiKeys")}
+      </h3>
+      <p className="text-sm text-muted-foreground py-2 pb-6">
+        {t("Chat.ChatPreferences.apiKeysDescription")}
+      </p>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="p-4 md:p-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label>{t("Common.provider")}</Label>
+              <Select
+                value={provider}
+                onValueChange={(v) => setProvider(v as ProviderKey)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("Common.select")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDERS.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="flex items-center gap-2">
+                        <ModelProviderIcon provider={p.id} className="size-3" />
+                        <span>{p.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>{t("Common.label")}</Label>
+              <Input
+                placeholder="default"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>API Key</Label>
+              <Input
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Base URL</Label>
+              <Input
+                placeholder="https://api.openai.com/v1"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("Chat.ChatPreferences.baseUrlHint")}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={onSave}
+                disabled={!provider || !apiKey || isSubmitting}
+              >
+                {t("Common.save")}
+                {isSubmitting && (
+                  <Loader className="size-4 ml-2 animate-spin" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 md:p-6">
+          <div className="flex flex-col gap-4">
+            <Label>{t("Chat.ChatPreferences.existingKeys")}</Label>
+            {isLoading ? (
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10" />
+                ))}
+              </div>
+            ) : !data || Object.keys(data || {}).length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                {t("Chat.ChatPreferences.noKeys")}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {Object.entries(data).map(([prov, list]) => (
+                  <div key={prov} className="border rounded-lg p-3">
+                    <div className="font-medium mb-2 flex items-center gap-2">
+                      <ModelProviderIcon provider={prov} className="size-3" />
+                      <span>{prov}</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {(list as any[]).map((k, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col">
+                              <span>{k.label || "default"}</span>
+                              <span className="text-muted-foreground">
+                                {k.baseUrl || "default endpoint"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => onDelete(prov, k.label || null)}
+                              aria-label={t("Common.delete")}
+                            >
+                              <span className="sr-only">
+                                {t("Common.delete")}
+                              </span>
+                              <GoTrash className="size-4 text-red-700 dark:text-red-400" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
 export function UserInstructionsContent() {
   const t = useTranslations();
@@ -132,7 +349,7 @@ export function UserInstructionsContent() {
             <Skeleton className="h-9" />
           ) : (
             <Input
-              placeholder="better-chatbot"
+              placeholder="Crafty AI"
               value={preferences.botName}
               onChange={(e) => {
                 setPreferences({
@@ -180,7 +397,7 @@ export function UserInstructionsContent() {
             ) : (
               <>
                 <Textarea
-                  className="h-60 resize-none"
+                  className="h-40 resize-none"
                   value={preferences.responseStyleExample}
                   onChange={(e) => {
                     setPreferences({

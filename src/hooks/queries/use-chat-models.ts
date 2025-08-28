@@ -9,6 +9,7 @@ export const useChatModels = () => {
       models: {
         name: string;
         isToolCallUnsupported: boolean;
+        supportsImage?: boolean;
       }[];
     }[]
   >("/api/chat/models", fetcher, {

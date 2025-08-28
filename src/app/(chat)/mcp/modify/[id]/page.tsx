@@ -18,7 +18,7 @@ export default async function Page({
   }
 
   return (
-    <div className="container max-w-3xl mx-4 md:mx-auto py-8">
+    <div className="container max-w-4xl mx-4 md:mx-auto py-8">
       <div className="flex flex-col gap-2">
         <Link
           href="/mcp"

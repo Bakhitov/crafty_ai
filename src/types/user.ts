@@ -38,3 +38,22 @@ export const UserPreferencesZodSchema = z.object({
   responseStyleExample: z.string().optional(),
   botName: z.string().optional(),
 });
+
+// API keys stored in user.api_keys (jsonb)
+export type ApiKeyEncrypted = {
+  label?: string | null;
+  cipher: string; // base64
+  iv: string; // base64
+  tag: string; // base64 (GCM auth tag)
+  version: number; // crypto schema version
+  isActive?: boolean; // default true
+  createdAt?: string; // ISO
+  lastUsedAt?: string | null; // ISO
+  expiresAt?: string | null; // ISO
+  scopes?: string[];
+  baseUrl?: string | null; // optional custom endpoint per provider
+};
+
+export type ApiKeysJson = {
+  [provider: string]: ApiKeyEncrypted[] | undefined;
+};

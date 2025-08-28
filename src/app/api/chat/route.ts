@@ -19,7 +19,11 @@ import {
   buildUserSystemPrompt,
   buildToolCallUnsupportedModelSystemPrompt,
 } from "lib/ai/prompts";
-import { chatApiSchemaRequestBodySchema, ChatMetadata } from "app-types/chat";
+import {
+  chatApiSchemaRequestBodySchema,
+  ChatMetadata,
+  ChatMention,
+} from "app-types/chat";
 
 import { errorIf, safe } from "ts-safe";
 
@@ -42,6 +46,8 @@ import {
 import { getSession } from "auth/server";
 import { colorize } from "consola/utils";
 import { generateUUID } from "lib/utils";
+import { UserKeyService } from "lib/services/user-key.service";
+import { setExaApiKey, clearExaApiKey } from "lib/ai/tools/web/web-search";
 
 const logger = globalLogger.withDefaults({
   message: colorize("blackBright", `Chat API: `),
@@ -66,7 +72,10 @@ export async function POST(request: Request) {
       mentions = [],
     } = chatApiSchemaRequestBodySchema.parse(json);
 
-    const model = customModelProvider.getModel(chatModel);
+    const model = await customModelProvider.getModelForUser(
+      session.user.id,
+      chatModel,
+    );
 
     let thread = await chatRepository.selectThreadDetails(id);
 
@@ -100,7 +109,10 @@ export async function POST(request: Request) {
 
     const supportToolCall = !isToolCallUnsupportedModel(model);
 
-    const agentId = mentions.find((m) => m.type === "agent")?.agentId;
+    const agentMention = mentions.find(
+      (m): m is Extract<ChatMention, { type: "agent" }> => m.type === "agent",
+    );
+    const agentId = agentMention?.agentId;
 
     const agent = await rememberAgentAction(agentId, session.user.id);
 
@@ -141,6 +153,7 @@ export async function POST(request: Request) {
             loadWorkFlowTools({
               mentions,
               dataStream,
+              userId: session.user.id,
             }),
           )
           .orElse({});
@@ -154,6 +167,10 @@ export async function POST(request: Request) {
             }),
           )
           .orElse({});
+        // Inject user-scoped EXA key for app default web-search tools (before any tool execution)
+        const exaKey = await UserKeyService.getKeyFor(session.user.id, "exa");
+        setExaApiKey(exaKey);
+
         const inProgressToolParts = extractInProgressToolPart(message);
         if (inProgressToolParts.length) {
           await Promise.all(
@@ -248,6 +265,8 @@ export async function POST(request: Request) {
 
       generateId: generateUUID,
       onFinish: async ({ responseMessage }) => {
+        // Ensure EXA key is cleared after the conversation finishes
+        clearExaApiKey();
         if (responseMessage.id == message.id) {
           await chatRepository.upsertMessage({
             threadId: thread!.id,
@@ -277,7 +296,11 @@ export async function POST(request: Request) {
           } as any);
         }
       },
-      onError: handleError,
+      onError: (e) => {
+        // Clear EXA key even if error happens
+        clearExaApiKey();
+        return handleError(e);
+      },
       originalMessages: messages,
     });
 

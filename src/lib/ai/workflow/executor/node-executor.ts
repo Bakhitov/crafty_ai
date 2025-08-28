@@ -30,6 +30,8 @@ import {
   exaSearchToolForWorkflow,
   exaContentsToolForWorkflow,
 } from "lib/ai/tools/web/web-search";
+import { UserKeyService } from "lib/services/user-key.service";
+import { setExaApiKey, clearExaApiKey } from "lib/ai/tools/web/web-search";
 import { mcpClientsManager } from "lib/ai/mcp/mcp-manager";
 
 /**
@@ -91,7 +93,10 @@ export const llmNodeExecutor: NodeExecutor<LLMNodeData> = async ({
   node,
   state,
 }) => {
-  const model = customModelProvider.getModel(node.model);
+  const model = await customModelProvider.getModelForUser(
+    state.query["__userId"] as string,
+    node.model,
+  );
 
   // Convert TipTap JSON messages to AI SDK format, resolving mentions to actual data
   const messages: Omit<UIMessage, "id">[] = node.messages.map((message) =>
@@ -115,6 +120,11 @@ export const llmNodeExecutor: NodeExecutor<LLMNodeData> = async ({
     const response = await generateText({
       model,
       messages: convertToModelMessages(messages),
+      providerOptions:
+        node.model?.provider === "google" &&
+        node.model?.model === "gemini-2.5-flash-image-preview"
+          ? { google: { responseModalities: ["TEXT", "IMAGE"] } }
+          : undefined,
     });
     return {
       output: {
@@ -249,6 +259,7 @@ export const toolNodeExecutor: NodeExecutor<ToolNodeData> = async ({
       tool_result: toolResult,
     };
   } else if (node.tool.type == "app-tool") {
+    // Bind EXA key for app-tool web-search before execution
     const executor =
       node.tool.id == DefaultToolName.WebContent
         ? exaContentsToolForWorkflow.execute
@@ -256,10 +267,23 @@ export const toolNodeExecutor: NodeExecutor<ToolNodeData> = async ({
           ? exaSearchToolForWorkflow.execute
           : () => "Unknown tool";
 
+    if (
+      node.tool.type == "app-tool" &&
+      (node.tool.id == DefaultToolName.WebContent ||
+        node.tool.id == DefaultToolName.WebSearch)
+    ) {
+      const exaKey = await UserKeyService.getKeyFor(
+        state.query["__userId"] as string,
+        "exa",
+      );
+      setExaApiKey(exaKey);
+    }
+
     const toolResult = await executor?.(result.input.parameter, {
       messages: [],
       toolCallId: "",
     });
+    clearExaApiKey();
     result.output = {
       tool_result: toolResult,
     };

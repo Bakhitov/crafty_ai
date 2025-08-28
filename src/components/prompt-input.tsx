@@ -18,6 +18,7 @@ import { useShallow } from "zustand/shallow";
 import { ChatMention, ChatModel } from "app-types/chat";
 import dynamic from "next/dynamic";
 import { ToolModeDropdown } from "./tool-mode-dropdown";
+import { RiImageCircleAiFill } from "react-icons/ri";
 
 import { ToolSelectDropdown } from "./tool-select-dropdown";
 import { Tooltip, TooltipContent, TooltipTrigger } from "ui/tooltip";
@@ -33,6 +34,7 @@ import { OpenAIIcon } from "ui/openai-icon";
 import { GrokIcon } from "ui/grok-icon";
 import { ClaudeIcon } from "ui/claude-icon";
 import { GeminiIcon } from "ui/gemini-icon";
+import { useChatModels } from "@/hooks/queries/use-chat-models";
 
 import { EMOJI_DATA } from "lib/const";
 import { AgentSummary } from "app-types/agent";
@@ -94,6 +96,14 @@ export default function PromptInput({
     return model ?? globalModel;
   }, [model, globalModel]);
 
+  const { data: providers } = useChatModels();
+  const supportsImageForCurrent = useMemo(() => {
+    if (!providers || !chatModel) return false;
+    const p = providers.find((p) => p.provider === chatModel.provider);
+    const m = p?.models.find((m) => m.name === chatModel.model);
+    return Boolean(m?.supportsImage);
+  }, [providers, chatModel]);
+
   const editorRef = useRef<Editor | null>(null);
 
   const setChatModel = useCallback(
@@ -120,7 +130,7 @@ export default function PromptInput({
         };
       });
     },
-    [mentions, threadId],
+    [mentions, appStoreMutate, threadId],
   );
 
   const addMention = useCallback(
@@ -347,7 +357,7 @@ export default function PromptInput({
                   <Button
                     variant={"ghost"}
                     size={"sm"}
-                    className="rounded-full group data-[state=open]:bg-input! hover:bg-input! mr-1"
+                    className="rounded-full group data-[state=open]:bg-input! hover:bg-input! mr-1 min-w-[130px]"
                     data-testid="model-selector-button"
                   >
                     {chatModel?.model ? (
@@ -367,6 +377,9 @@ export default function PromptInput({
                         >
                           {chatModel.model}
                         </span>
+                        {supportsImageForCurrent && (
+                          <RiImageCircleAiFill className="size-3 opacity-0 group-data-[state=open]:opacity-100 group-hover:opacity-100" />
+                        )}
                       </>
                     ) : (
                       <span className="text-muted-foreground">model</span>

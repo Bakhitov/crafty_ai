@@ -76,7 +76,7 @@ export async function POST(
       // Start the workflow
       app
         .run(
-          { query },
+          { query: { ...query, __userId: session.user.id } },
           {
             disableHistory: true,
             timeout: 1000 * 60 * 5,

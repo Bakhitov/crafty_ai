@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { isNotNull } from "drizzle-orm";
 import { DBWorkflow, DBEdge, DBNode } from "app-types/workflow";
+import { ApiKeysJson } from "app-types/user";
 import { UIMessage } from "ai";
 import { ChatMetadata } from "app-types/chat";
 
@@ -95,6 +96,7 @@ export const UserSchema = pgTable("user", {
   password: text("password"),
   image: text("image"),
   preferences: json("preferences").default({}).$type<UserPreferences>(),
+  apiKeys: json("api_keys").default({}).$type<ApiKeysJson>(),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -296,7 +298,7 @@ export const McpOAuthSessionSchema = pgTable(
   (t) => [
     index("mcp_oauth_session_server_id_idx").on(t.mcpServerId),
     index("mcp_oauth_session_state_idx").on(t.state),
-    // Partial index for sessions with tokens for better performance
+    // Partial index for sessions with tokens for crafty performance
     index("mcp_oauth_session_tokens_idx")
       .on(t.mcpServerId)
       .where(isNotNull(t.tokens)),

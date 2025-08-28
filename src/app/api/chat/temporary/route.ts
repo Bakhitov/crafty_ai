@@ -35,7 +35,10 @@ export async function POST(request: Request) {
       instructions?: string;
     };
     logger.info(`model: ${chatModel?.provider}/${chatModel?.model}`);
-    const model = customModelProvider.getModel(chatModel);
+    const model = await customModelProvider.getModelForUser(
+      session.user.id,
+      chatModel,
+    );
     const userPreferences =
       (await userRepository.getPreferences(session.user.id)) || undefined;
 
@@ -46,6 +49,11 @@ export async function POST(request: Request) {
       }`.trim(),
       messages: convertToModelMessages(messages),
       experimental_transform: smoothStream({ chunking: "word" }),
+      providerOptions:
+        chatModel?.provider === "google" &&
+        chatModel?.model === "gemini-2.5-flash-image-preview"
+          ? { google: { responseModalities: ["TEXT", "IMAGE"] } }
+          : undefined,
     }).toUIMessageStreamResponse();
   } catch (error: any) {
     logger.error(error);

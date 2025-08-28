@@ -66,6 +66,7 @@ firstTimeStorage.set(false);
 export default function ChatBot({ threadId, initialMessages }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const t = useTranslations();
 
   const [
     appStoreMutate,
@@ -110,7 +111,7 @@ export default function ChatBot({ threadId, initialMessages }: Props) {
         .flatMap((m) =>
           m.parts
             .filter((v) => v.type === "text")
-            .map((p) => `${m.role}: ${truncateString(p.text, 500)}`),
+            .map((p: any) => `${m.role}: ${truncateString(p.text || "", 500)}`),
         );
       if (part.length > 0) {
         generateTitle(part.join("\n\n"));
@@ -222,7 +223,7 @@ export default function ChatBot({ threadId, initialMessages }: Props) {
     const lastPart = lastMessage?.parts.at(-1);
     if (!lastPart) return "think";
     const secondPart = lastMessage?.parts[1];
-    if (secondPart?.type == "text" && secondPart.text.length == 0)
+    if (secondPart?.type == "text" && (secondPart as any).text?.length == 0)
       return "think";
     if (lastPart?.type == "step-start") {
       return lastMessage?.parts.length == 1 ? "think" : "space";
@@ -325,7 +326,8 @@ export default function ChatBot({ threadId, initialMessages }: Props) {
         const lastMessage = messages.at(-1);
         const lastMessageText = lastMessage!.parts
           .filter((part) => part.type == "text")
-          ?.at(-1)?.text;
+          ?.map((p: any) => p.text)
+          ?.at(-1);
         if (!lastMessageText) return;
         navigator.clipboard.writeText(lastMessageText);
         toast.success("Last message copied to clipboard");
@@ -343,6 +345,45 @@ export default function ChatBot({ threadId, initialMessages }: Props) {
       handleFocus();
     }
   }, [input]);
+
+  useEffect(() => {
+    if (!error) return;
+    const msg = String((error as any)?.message || "");
+    const isMissingKey = (() => {
+      const normalized = msg.replace(/\s+/g, " ").trim();
+      // Generic patterns to detect various provider wordings
+      const apiKeyPattern = /(api[\s\-_]?key)/i; // API key, APIKey, API_key, API-key
+      const missingTokens =
+        /(missing|not\s*set|not\s*configured|required|provide|unset|undefined|empty|absent)/i;
+      const invalidTokens = /(invalid|unauthorized)/i; // treat invalid/unauthorized as key issue
+
+      if (
+        apiKeyPattern.test(normalized) &&
+        (missingTokens.test(normalized) || invalidTokens.test(normalized))
+      ) {
+        return true;
+      }
+      // Fallback: known specific messages
+      if (
+        normalized.includes("User API key for provider") ||
+        normalized.includes("User OpenAI key is not configured") ||
+        normalized.includes("EXA_API_KEY is not configured") ||
+        normalized.includes("Invalid EXA API key")
+      ) {
+        return true;
+      }
+      return false;
+    })();
+    if (isMissingKey) {
+      toast.warning(t("Chat.MissingKeys.title"), {
+        description: t("Chat.MissingKeys.description"),
+        action: {
+          label: t("Chat.MissingKeys.openSettings"),
+          onClick: () => appStoreMutate({ openChatPreferences: true }),
+        },
+      });
+    }
+  }, [error]);
 
   return (
     <>

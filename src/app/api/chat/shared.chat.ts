@@ -225,12 +225,14 @@ export const workflowToVercelAITool = ({
   schema,
   dataStream,
   name,
+  userId,
 }: {
   id: string;
   name: string;
   description?: string;
   schema: ObjectJsonSchema7;
   dataStream: UIMessageStreamWriter;
+  userId: string;
 }): VercelAIWorkflowTool => {
   const toolName = name
     .replace(/[^a-zA-Z0-9\s]/g, "")
@@ -318,7 +320,7 @@ export const workflowToVercelAITool = ({
           });
           return executor.run(
             {
-              query: query ?? ({} as any),
+              query: { ...(query ?? ({} as any)), __userId: userId },
             },
             {
               disableHistory: true,
@@ -376,12 +378,14 @@ export const workflowToVercelAITools = (
     schema: ObjectJsonSchema7;
   }[],
   dataStream: UIMessageStreamWriter,
+  userId: string,
 ) => {
   return workflows
     .map((v) =>
       workflowToVercelAITool({
         ...v,
         dataStream,
+        userId,
       }),
     )
     .reduce(
@@ -409,6 +413,7 @@ export const loadMcpTools = (opt?: {
 export const loadWorkFlowTools = (opt: {
   mentions?: ChatMention[];
   dataStream: UIMessageStreamWriter;
+  userId?: string;
 }) =>
   safe(() =>
     opt?.mentions?.length
@@ -419,7 +424,15 @@ export const loadWorkFlowTools = (opt: {
         )
       : [],
   )
-    .map((tools) => workflowToVercelAITools(tools, opt.dataStream))
+    .map((tools) =>
+      workflowToVercelAITools(
+        tools,
+        opt.dataStream,
+        // Fallback: empty string won't inject a user id
+        // but keeps types narrow; prefer passing a real userId from caller
+        opt.userId || "",
+      ),
+    )
     .orElse({} as Record<string, VercelAIWorkflowTool>);
 
 export const loadAppDefaultTools = (opt?: {

@@ -35,10 +35,10 @@ import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { getLocaleAction } from "@/i18n/get-locale";
 import { useCallback } from "react";
-import { GithubIcon } from "ui/github-icon";
-import { DiscordIcon } from "ui/discord-icon";
 import { useThemeStyle } from "@/hooks/use-theme-style";
 import { Session, User } from "better-auth";
+import { RiWhatsappLine } from "react-icons/ri";
+import { RiTelegramLine } from "react-icons/ri";
 
 export function AppSidebarUser({
   session,
@@ -133,24 +133,30 @@ export function AppSidebarUser({
               <Command className="size-4 text-foreground" />
               <span>{t("keyboardShortcuts")}</span>
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel className="p-0 font-normal">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span>{t("contacts")}</span>
+                </div>
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuItem
-              onClick={() => {
-                window.open(
-                  "https://github.com/cgoinglove/better-chatbot/issues/new",
-                  "_blank",
-                );
-              }}
+              className="cursor-pointer"
+              onClick={() =>
+                window.open("tg://resolve?phone=77066318623", "_blank")
+              }
             >
-              <GithubIcon className="size-4 fill-foreground" />
-              <span>{t("reportAnIssue")}</span>
+              <RiTelegramLine className="size-5 text-foreground" />
+              <span>Telegram</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => {
-                window.open("https://discord.gg/gCRu69Upnp", "_blank");
-              }}
+              className="cursor-pointer"
+              onClick={() => window.open("https://wa.me/77066318623", "_blank")}
             >
-              <DiscordIcon className="size-4 fill-foreground" />
-              <span>{t("joinCommunity")}</span>
+              <RiWhatsappLine className="size-5 text-foreground" />
+              <span>Whatsapp</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="cursor-pointer">

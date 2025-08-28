@@ -151,13 +151,19 @@ export const exaContentsSchema: JSONSchema7 = {
   required: ["urls"],
 };
 
-const API_KEY = process.env.EXA_API_KEY;
+// EXA API key is now user-scoped; must be provided by caller via setter before execute
+let EXA_API_KEY_RUNTIME: string | null = null;
+export function setExaApiKey(key: string | null) {
+  EXA_API_KEY_RUNTIME = key;
+}
+export function clearExaApiKey() {
+  EXA_API_KEY_RUNTIME = null;
+}
 const BASE_URL = "https://api.exa.ai";
 
 const fetchExa = async (endpoint: string, body: any): Promise<any> => {
-  if (!API_KEY) {
-    throw new Error("EXA_API_KEY is not configured");
-  }
+  const API_KEY = EXA_API_KEY_RUNTIME;
+  if (!API_KEY) throw new Error("EXA_API_KEY is not configured");
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     method: "POST",
@@ -186,7 +192,8 @@ export const exaSearchToolForWorkflow = createTool({
   description:
     "Search the web using Exa AI - performs real-time web searches with semantic and neural search capabilities. Returns high-quality, relevant results with full content extraction.",
   inputSchema: jsonSchemaToZod(exaSearchSchema),
-  execute: async (params) => {
+  execute: async (params, _toolContext) => {
+    // Caller must set EXA_API_KEY_RUNTIME before execute
     const searchRequest: ExaSearchRequest = {
       query: params.query,
       type: params.type || "auto",
@@ -218,7 +225,7 @@ export const exaContentsToolForWorkflow = createTool({
   description:
     "Extract detailed content from specific URLs using Exa AI - retrieves full text content, metadata, and structured information from web pages with live crawling capabilities.",
   inputSchema: jsonSchemaToZod(exaContentsSchema),
-  execute: async (params) => {
+  execute: async (params, _toolContext) => {
     const contentsRequest: ExaContentsRequest = {
       ids: params.urls,
       contents: {
@@ -237,7 +244,7 @@ export const exaSearchTool = createTool({
   description:
     "Search the web using Exa AI - performs real-time web searches with semantic and neural search capabilities. Returns high-quality, relevant results with full content extraction.",
   inputSchema: jsonSchemaToZod(exaSearchSchema),
-  execute: (params) => {
+  execute: (params, _toolContext) => {
     return safe(async () => {
       const searchRequest: ExaSearchRequest = {
         query: params.query,
@@ -285,7 +292,7 @@ export const exaContentsTool = createTool({
   description:
     "Extract detailed content from specific URLs using Exa AI - retrieves full text content, metadata, and structured information from web pages with live crawling capabilities.",
   inputSchema: jsonSchemaToZod(exaContentsSchema),
-  execute: async (params) => {
+  execute: async (params, _toolContext) => {
     return safe(async () => {
       const contentsRequest: ExaContentsRequest = {
         ids: params.urls,

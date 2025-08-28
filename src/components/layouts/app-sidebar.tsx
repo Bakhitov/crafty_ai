@@ -22,6 +22,8 @@ import { AppSidebarUser } from "./app-sidebar-user";
 import { PanelLeft } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Session, User } from "better-auth";
+import { Badge } from "ui/badge";
+import { Think } from "ui/think";
 
 export function AppSidebar({
   session,
@@ -72,7 +74,18 @@ export function AppSidebar({
                   router.refresh();
                 }}
               >
-                <h4 className="font-bold">better-chatbot</h4>
+                <h1 className="text-xl font-semibold flex items-center gap-3 animate-in fade-in duration-1000">
+                  <Think />
+                  <span>Crafty AI</span>
+                </h1>
+                <h4 className="text-xl font-semibold inline-flex items-center gap-2">
+                  <Badge
+                    variant={"secondary"}
+                    className="rounded-full border-input text-[10px] px-1.5 py-0 uppercase"
+                  >
+                    Beta
+                  </Badge>
+                </h4>
                 <div
                   className="ml-auto block sm:hidden"
                   onClick={(e) => {

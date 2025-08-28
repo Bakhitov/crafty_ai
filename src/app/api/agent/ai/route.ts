@@ -82,10 +82,18 @@ export async function POST(request: Request) {
     const system = buildAgentGenerationPrompt(Array.from(toolNames));
 
     const result = streamObject({
-      model: customModelProvider.getModel(chatModel),
+      model: await customModelProvider.getModelForUser(
+        session.user.id,
+        chatModel,
+      ),
       system,
       prompt: message,
       schema: dynamicAgentSchema,
+      providerOptions:
+        chatModel?.provider === "google" &&
+        chatModel?.model === "gemini-2.5-flash-image-preview"
+          ? { google: { responseModalities: ["TEXT", "IMAGE"] } }
+          : undefined,
     });
 
     return result.toTextStreamResponse();

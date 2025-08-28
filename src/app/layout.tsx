@@ -18,9 +18,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "better-chatbot",
+  title: "Crafty AI",
   description:
-    "Better Chatbot is a chatbot that uses the Tools to answer questions.",
+    "Crafty AI is a chatbot that uses the Tools and MCP to answer questions.",
 };
 
 // const themes = BASE_THEMES.flatMap((t) => [t, `${t}-dark`]);

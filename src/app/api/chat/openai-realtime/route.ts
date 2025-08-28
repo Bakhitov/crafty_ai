@@ -20,6 +20,7 @@ import {
 } from "../actions";
 import globalLogger from "lib/logger";
 import { colorize } from "consola/utils";
+import { UserKeyService } from "lib/services/user-key.service";
 
 const logger = globalLogger.withDefaults({
   message: colorize("blackBright", `OpenAI Realtime API: `),
@@ -27,19 +28,20 @@ const logger = globalLogger.withDefaults({
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY is not set" }),
-        {
-          status: 500,
-        },
-      );
-    }
-
+    // user-scoped OpenAI key
     const session = await getSession();
-
     if (!session?.user.id) {
       return new Response("Unauthorized", { status: 401 });
+    }
+    const userOpenAIKey = await UserKeyService.getKeyFor(
+      session.user.id,
+      "openai",
+    );
+    if (!userOpenAIKey) {
+      return new Response(
+        JSON.stringify({ error: "User OpenAI key is not configured" }),
+        { status: 422 },
+      );
     }
 
     const { voice, allowedMcpServers, agentId } = (await request.json()) as {
@@ -102,7 +104,7 @@ export async function POST(request: NextRequest) {
     const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${userOpenAIKey}`,
         "Content-Type": "application/json",
       },
 

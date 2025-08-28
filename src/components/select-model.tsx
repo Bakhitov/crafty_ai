@@ -4,6 +4,7 @@ import { appStore } from "@/app/store";
 import { useChatModels } from "@/hooks/queries/use-chat-models";
 import { ChatModel } from "app-types/chat";
 import { CheckIcon, ChevronDown } from "lucide-react";
+import { RiImageCircleAiFill } from "react-icons/ri";
 import { Fragment, memo, PropsWithChildren, useEffect, useState } from "react";
 import { Button } from "ui/button";
 
@@ -30,6 +31,11 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
   const [open, setOpen] = useState(false);
   const { data: providers } = useChatModels();
   const [model, setModel] = useState(props.currentModel);
+  const supportsImageForCurrent = (() => {
+    const p = providers?.find((p) => p.provider === model?.provider);
+    const m = p?.models.find((m) => m.name === model?.model);
+    return m?.supportsImage;
+  })();
 
   useEffect(() => {
     const modelToUse = props.currentModel ?? appStore.getState().chatModel;
@@ -57,13 +63,16 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
                 />
               )}
               <p data-testid="selected-model-name">{model?.model || "model"}</p>
+              {supportsImageForCurrent && (
+                <RiImageCircleAiFill className="size-3 text-muted-foreground" />
+              )}
             </div>
             <ChevronDown className="size-3" />
           </Button>
         )}
       </PopoverTrigger>
       <PopoverContent
-        className="p-0 w-[280px]"
+        className="p-0 w-[364px]"
         align={props.align || "end"}
         data-testid="model-selector-popover"
       >
@@ -115,7 +124,10 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
                       ) : (
                         <div className="ml-3" />
                       )}
-                      <span className="pr-2">{item.name}</span>
+                      <span className="pr-1">{item.name}</span>
+                      {item.supportsImage && (
+                        <RiImageCircleAiFill className="size-3 text-muted-foreground" />
+                      )}
                       {item.isToolCallUnsupported && (
                         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
                           No tools
