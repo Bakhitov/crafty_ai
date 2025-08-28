@@ -436,7 +436,7 @@
   },
   "MCP": {
     "marketplace": "Маркетплейс",
-    "addMcpServer": "Сервер қосу",
+    "addMcpServer": "Өз Серверіңді Қосу",
     "nameTitle": "Сервер атауы",
     "configureYourMcpServerConnectionSettings": "MCP серверіне қосылу баптауларын орнатыңыз",
     "mcpConfiguration": "MCP конфигурациясы",

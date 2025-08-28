@@ -34,14 +34,6 @@ interface MCPEditorProps {
 }
 
 const STDIO_ARGS_ENV_PLACEHOLDER = `/** STDIO Example */
-{
-  "command": "node", 
-  "args": ["index.js"],
-  "env": {
-    "OPENAI_API_KEY": "sk-...",
-  }
-}
-
 /** SSE,Streamable HTTP Example */
 {
   "url": "https://api.example.com",

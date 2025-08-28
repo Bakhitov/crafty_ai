@@ -441,7 +441,7 @@
   },
   "MCP": {
     "marketplace": "Marketplace",
-    "addMcpServer": "Add Server",
+    "addMcpServer": "Add Your Server",
     "nameTitle": "Server Name",
     "configureYourMcpServerConnectionSettings": "Configure your MCP server connection settings",
     "mcpConfiguration": "MCP Configuration",

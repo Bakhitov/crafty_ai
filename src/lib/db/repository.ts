@@ -7,6 +7,7 @@ import { pgWorkflowRepository } from "./pg/repositories/workflow-repository.pg";
 import { pgAgentRepository } from "./pg/repositories/agent-repository.pg";
 import { pgArchiveRepository } from "./pg/repositories/archive-repository.pg";
 import { pgMcpOAuthRepository } from "./pg/repositories/mcp-oauth-repository.pg";
+import { pgMcpTemplateRepository } from "./pg/repositories/mcp-template-repository.pg";
 import { pgBookmarkRepository } from "./pg/repositories/bookmark-repository.pg";
 
 export const chatRepository = pgChatRepository;
@@ -17,6 +18,7 @@ export const mcpMcpToolCustomizationRepository =
 export const mcpServerCustomizationRepository =
   pgMcpServerCustomizationRepository;
 export const mcpOAuthRepository = pgMcpOAuthRepository;
+export const mcpTemplateRepository = pgMcpTemplateRepository;
 
 export const workflowRepository = pgWorkflowRepository;
 export const agentRepository = pgAgentRepository;

@@ -3,7 +3,7 @@ import { MCPCard } from "@/components/mcp-card";
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { MCPOverview, RECOMMENDED_MCPS } from "@/components/mcp-overview";
+import { MCPOverview } from "@/components/mcp-overview";
 
 import { Skeleton } from "ui/skeleton";
 
@@ -13,6 +13,8 @@ import { MCPIcon } from "ui/mcp-icon";
 import { useMcpList } from "@/hooks/queries/use-mcp-list";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
+import { useMcpTemplates } from "@/hooks/queries/use-mcp-templates";
+import { MCPTemplateIcon } from "./mcp-icon-resolver";
 import { MCPServerInfo } from "app-types/mcp";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -49,17 +51,23 @@ export default function MCPDashboard({ message }: { message?: string }) {
     });
   }, [mcpList]);
 
+  const { data: templates } = useMcpTemplates();
   const displayIcons = useMemo(() => {
-    const shuffled = [...RECOMMENDED_MCPS].sort(() => 0.5 - Math.random());
+    const shuffled = [...(templates ?? [])].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 5);
-  }, []);
+  }, [templates]);
 
   // Delay showing validating spinner until validating persists for 500ms
   const [showValidating, setShowValidating] = useState(false);
 
-  const handleRecommendedSelect = (mcp: (typeof RECOMMENDED_MCPS)[number]) => {
+  const handleRecommendedSelect = (mcp: {
+    name: string | null;
+    label: string | null;
+    config: any;
+  }) => {
     const params = new URLSearchParams();
-    params.set("name", mcp.name);
+    const name = mcp.name ?? mcp.label ?? "template";
+    params.set("name", name);
     params.set("config", JSON.stringify(mcp.config));
     router.push(`/mcp/create?${params.toString()}`);
   };
@@ -125,16 +133,18 @@ export default function MCPDashboard({ message }: { message?: string }) {
                     >
                       <div className="flex -space-x-2">
                         {displayIcons.map((mcp, index) => {
-                          const Icon = mcp.icon;
                           return (
                             <div
-                              key={mcp.name}
+                              key={mcp.name ?? mcp.label ?? index}
                               className="relative rounded-full bg-background border-[1px] p-1"
                               style={{
                                 zIndex: displayIcons.length - index,
                               }}
                             >
-                              <Icon className="size-3" />
+                              <MCPTemplateIcon
+                                icon={mcp.icon ?? undefined}
+                                className="size-3"
+                              />
                             </div>
                           );
                         })}
@@ -142,16 +152,20 @@ export default function MCPDashboard({ message }: { message?: string }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    {RECOMMENDED_MCPS.map((mcp) => {
-                      const Icon = mcp.icon;
+                    {(templates ?? []).map((mcp) => {
                       return (
                         <DropdownMenuItem
-                          key={mcp.name}
+                          key={
+                            mcp.name ?? mcp.label ?? JSON.stringify(mcp.config)
+                          }
                           onClick={() => handleRecommendedSelect(mcp)}
                           className="cursor-pointer"
                         >
-                          <Icon className="size-4 mr-2" />
-                          <span>{mcp.label}</span>
+                          <MCPTemplateIcon
+                            icon={mcp.icon ?? undefined}
+                            className="size-4 mr-2"
+                          />
+                          <span>{mcp.label ?? mcp.name}</span>
                         </DropdownMenuItem>
                       );
                     })}

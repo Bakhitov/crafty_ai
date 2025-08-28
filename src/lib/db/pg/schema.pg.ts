@@ -88,6 +88,16 @@ export const McpServerSchema = pgTable("mcp_server", {
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+// MCP server templates (presets) taken from DB instead of hardcoded
+export const McpTemplateSchema = pgTable("mcp_template", {
+  name: text("name"),
+  label: text("label"),
+  config: json("config").notNull().$type<MCPServerConfig>(),
+  icon: text("icon"), // component name or URL
+  isPrivate: boolean("is_private").notNull().default(false),
+  version: text("version"),
+});
+
 export const UserSchema = pgTable("user", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   name: text("name").notNull(),
@@ -306,6 +316,7 @@ export const McpOAuthSessionSchema = pgTable(
 );
 
 export type McpServerEntity = typeof McpServerSchema.$inferSelect;
+export type McpTemplateEntity = typeof McpTemplateSchema.$inferSelect;
 export type ChatThreadEntity = typeof ChatThreadSchema.$inferSelect;
 export type ChatMessageEntity = typeof ChatMessageSchema.$inferSelect;
 

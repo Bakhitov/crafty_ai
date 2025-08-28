@@ -438,7 +438,7 @@
   "MCP": {
     "marketplace": "Маркетплейс",
     "nameTitle": "Название сервера",
-    "addMcpServer": "Добавить сервер",
+    "addMcpServer": "Добавить свой сервер",
     "configureYourMcpServerConnectionSettings": "Настройте параметры подключения к MCP-серверу",
     "mcpConfiguration": "Конфигурация MCP",
     "nameMustContainOnlyAlphanumericCharactersAndHyphens": "Название может содержать только буквы, цифры и дефисы",
