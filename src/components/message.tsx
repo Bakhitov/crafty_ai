@@ -196,10 +196,12 @@ const PurePreviewMessage = ({
                     <span className="text-sm font-medium">
                       {offset + 1} step - {tool || tn}
                     </span>
-                    <span className="text-xs text-muted-foreground ml-2">
-                      {"Request - "}
-                      {summarizeInput((p as any).input)}
-                    </span>
+                    <div className="text-xs text-muted-foreground ml-2 flex-1 min-w-0 flex gap-1">
+                      <span className="shrink-0">Request -</span>
+                      <span className="whitespace-pre-wrap break-words">
+                        {summarizeInput((p as any).input)}
+                      </span>
+                    </div>
                   </div>
                   {stepOpen && (
                     <ToolMessagePart
