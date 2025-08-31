@@ -589,9 +589,9 @@ export const ReasoningPart = memo(function ReasoningPart({
     >
       <div className="flex flex-row gap-2 items-center text-ring hover:text-primary transition-colors">
         {isThinking ? (
-          <TextShimmer>Reasoned for a few seconds</TextShimmer>
+          <TextShimmer>Reasoning...</TextShimmer>
         ) : (
-          <div className="font-medium">Reasoned for a few seconds</div>
+          <div className="font-medium">Reasoning...</div>
         )}
 
         <button

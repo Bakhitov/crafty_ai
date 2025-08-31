@@ -91,7 +91,7 @@ const calculateToolCount = (
   mcpList: (MCPServerInfo & { id: string })[],
 ) => {
   return mcpList.reduce((acc, server) => {
-    const count = allowedMcpServers[server.id]?.tools?.length;
+    const count = allowedMcpServers[server.id]?.tools?.length ?? 0;
     return acc + count;
   }, 0);
 };
@@ -285,6 +285,12 @@ function ToolPresets() {
       }
       if (presets.find((p) => p.name === name)) {
         toast.error(t("Chat.Tool.presetNameAlreadyExists"));
+        return;
+      }
+      // блокируем сохранение, если нет выбранных тулзов вовсе
+      const totalTools = calculateToolCount(allowedMcpServers ?? {}, mcpList);
+      if (totalTools === 0 && (allowedAppDefaultToolkit?.length ?? 0) === 0) {
+        toast.error(t("Chat.Tool.noPresetsAvailableYet"));
         return;
       }
       appStoreMutate((prev) => {

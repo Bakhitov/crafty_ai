@@ -210,7 +210,7 @@
       "temporaryChatInstructionsPlaceholder": "Enter your instructions here",
       "temporaryChatInstructionsDescription": "You can set instructions for the temporary chat. This will be used as a system prompt for the temporary chat."
     },
-    "placeholder": "Ask anything or @mention",
+    "placeholder": "Ask anything or @mention what you want to use",
     "Tool": {
       "webSearching": "Searching the Web...",
       "searchedTheWeb": "Searched the Web",

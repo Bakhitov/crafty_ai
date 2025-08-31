@@ -131,7 +131,7 @@ export const getWeatherNodes: Partial<DBNode>[] = [
           },
         },
       ],
-      model: { provider: "openai", model: "4o" },
+      model: { provider: "openai", model: "4.1-mini" },
     },
   },
   {

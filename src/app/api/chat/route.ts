@@ -168,7 +168,10 @@ export async function POST(request: Request) {
           )
           .orElse({});
         // Inject user-scoped EXA key for app default web-search tools (before any tool execution)
-        const exaKey = await UserKeyService.getKeyFor(session.user.id, "exa");
+        const exaKey =
+          (await UserKeyService.getKeyFor(session.user.id, "exa")) ||
+          process.env.EXA_API_KEY ||
+          null;
         setExaApiKey(exaKey);
 
         const inProgressToolParts = extractInProgressToolPart(message);

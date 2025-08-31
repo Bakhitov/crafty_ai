@@ -28,7 +28,7 @@ export const babyResearchNodes: Partial<DBNode>[] = [
         type: "object",
         properties: { tool_result: { type: "object" } },
       },
-      model: { provider: "openai", model: "4o" },
+      model: { provider: "openai", model: "4.1-mini" },
       message: {
         type: "doc",
         content: [
@@ -340,7 +340,7 @@ export const babyResearchNodes: Partial<DBNode>[] = [
         type: "object",
         properties: { tool_result: { type: "object" } },
       },
-      model: { provider: "openai", model: "4o" },
+      model: { provider: "openai", model: "4.1-mini" },
       message: {
         type: "doc",
         content: [
@@ -1108,7 +1108,7 @@ export const babyResearchNodes: Partial<DBNode>[] = [
           },
         },
       ],
-      model: { provider: "anthropic", model: "claude-4-sonnet" },
+      model: { provider: "openai", model: "4.1-mini" },
     },
   },
   {
@@ -1166,7 +1166,7 @@ export const babyResearchNodes: Partial<DBNode>[] = [
         type: "object",
         properties: { tool_result: { type: "object" } },
       },
-      model: { provider: "openai", model: "4o" },
+      model: { provider: "openai", model: "4.1-mini" },
       message: {
         type: "doc",
         content: [
@@ -1731,7 +1731,7 @@ export const babyResearchNodes: Partial<DBNode>[] = [
           },
         },
       ],
-      model: { provider: "openai", model: "4o" },
+      model: { provider: "openai", model: "4.1-mini" },
     },
   },
   {
@@ -2416,7 +2416,7 @@ export const babyResearchNodes: Partial<DBNode>[] = [
           },
         },
       ],
-      model: { provider: "openai", model: "4o" },
+      model: { provider: "openai", model: "4.1-mini" },
     },
   },
   {

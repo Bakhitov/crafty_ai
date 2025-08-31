@@ -205,6 +205,12 @@ export const toolNodeExecutor: NodeExecutor<ToolNodeData> = async ({
 
   if (!node.tool) throw new Error("Tool not found");
 
+  // Получаем модель с пользовательским ключом для генерации параметров тулзы
+  const model = await customModelProvider.getModelForUser(
+    state.query["__userId"] as string,
+    node.model,
+  );
+
   // Handle parameter generation
   if (!node.tool?.parameterSchema) {
     // Tool doesn't need parameters
@@ -224,7 +230,7 @@ export const toolNodeExecutor: NodeExecutor<ToolNodeData> = async ({
       : undefined;
 
     const response = await generateText({
-      model: customModelProvider.getModel(node.model),
+      model: model,
       toolChoice: "required", // Force the model to call the tool
       prompt: prompt || "",
       tools: {
@@ -272,10 +278,13 @@ export const toolNodeExecutor: NodeExecutor<ToolNodeData> = async ({
       (node.tool.id == DefaultToolName.WebContent ||
         node.tool.id == DefaultToolName.WebSearch)
     ) {
-      const exaKey = await UserKeyService.getKeyFor(
-        state.query["__userId"] as string,
-        "exa",
-      );
+      const exaKey =
+        (await UserKeyService.getKeyFor(
+          state.query["__userId"] as string,
+          "exa",
+        )) ||
+        process.env.EXA_API_KEY ||
+        null;
       setExaApiKey(exaKey);
     }
 

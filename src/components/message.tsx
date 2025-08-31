@@ -18,6 +18,7 @@ import {
   ChevronUp,
   TriangleAlertIcon,
   Hammer as HammerIcon,
+  Loader,
 } from "lucide-react";
 import { Button } from "ui/button";
 import { useTranslations } from "next-intl";
@@ -147,6 +148,19 @@ const PurePreviewMessage = ({
       return summarizeValue(input);
     };
 
+    // Определяем, есть ли исполняющийся шаг в группе (последний незавершённый part текущего сообщения)
+    const anyExecuting = useMemo(() => {
+      return parts.some((p, offset) => {
+        const globalIndex = startIndex + offset;
+        const isLastPart = globalIndex === message.parts.length - 1;
+        return (
+          !String((p as any).state || "").startsWith("output") &&
+          isLastMessage &&
+          isLastPart
+        );
+      });
+    }, [parts, startIndex, isLastMessage, message.parts.length]);
+
     return (
       <div className="flex flex-col gap-2">
         <div
@@ -154,7 +168,11 @@ const PurePreviewMessage = ({
           onClick={() => setExpanded(!expanded)}
         >
           <div className="p-1.5 text-primary bg-input/40 rounded">
-            <HammerIcon className="h-3.5 w-3.5" />
+            {anyExecuting ? (
+              <Loader className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <HammerIcon className="h-3.5 w-3.5" />
+            )}
           </div>
           <span className="font-bold flex items-center gap-2">
             {serverName}
@@ -179,6 +197,10 @@ const PurePreviewMessage = ({
               const tn = getToolName(p);
               const { toolName: tool } = extractMCPToolId(tn);
               const stepOpen = !!stepExpanded[globalIndex];
+              const isExecuting =
+                !String((p as any).state || "").startsWith("output") &&
+                isLastMessage &&
+                isLastPart;
               return (
                 <div
                   key={`message-${messageIndex}-mcp-group-${serverName}-${globalIndex}`}
@@ -196,10 +218,13 @@ const PurePreviewMessage = ({
                     <span className="text-sm font-medium">
                       {offset + 1} step - {tool || tn}
                     </span>
+                    {isExecuting && (
+                      <Loader className="h-3.5 w-3.5 animate-spin" />
+                    )}
                     <div className="text-xs text-muted-foreground ml-2 flex-1 min-w-0 flex gap-1">
                       <span className="shrink-0">Request -</span>
                       <span className="whitespace-pre-wrap break-words">
-                        {summarizeInput((p as any).input)}
+                        {truncateString(summarizeInput((p as any).input), 70)}
                       </span>
                     </div>
                   </div>
@@ -213,6 +238,9 @@ const PurePreviewMessage = ({
                       addToolResult={addToolResult}
                       part={p}
                       setMessages={setMessages}
+                      isManualToolInvocation={String(
+                        (p as any).state || "",
+                      ).startsWith("input")}
                       hideTitle
                       alwaysExpanded
                     />

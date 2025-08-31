@@ -209,7 +209,7 @@
       "temporaryChatInstructionsPlaceholder": "Введите ваши инструкции здесь",
       "temporaryChatInstructionsDescription": "Вы можете задать инструкции для временного чата. Они будут использоваться как системная подсказка."
     },
-    "placeholder": "Спросите что угодно или упомяните @",
+    "placeholder": "Спросите что угодно или упомяните что хотите использовать @",
     "Tool": {
       "webSearching": "Поиск в Интернете...",
       "searchedTheWeb": "Поиск выполнен",

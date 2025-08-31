@@ -385,6 +385,27 @@ export default function ChatBot({ threadId, initialMessages }: Props) {
     }
   }, [error]);
 
+  const handleStop = useCallback(() => {
+    if (isPendingToolCall) {
+      // Отменяем ожидание ручного шага: удаляем последний ассистентский месседж с незавершённой тулзой
+      setMessages((prev) => {
+        const last = prev.at(-1);
+        if (!last || last.role !== "assistant") return prev;
+        const lastPart = last.parts.at(-1) as any;
+        if (
+          !lastPart ||
+          !isToolUIPart(lastPart) ||
+          String(lastPart.state || "").startsWith("output")
+        ) {
+          return prev;
+        }
+        return prev.slice(0, -1);
+      });
+      return;
+    }
+    stop();
+  }, [isPendingToolCall, stop, setMessages]);
+
   return (
     <>
       {particle}
@@ -465,7 +486,7 @@ export default function ChatBot({ threadId, initialMessages }: Props) {
             sendMessage={sendMessage}
             setInput={setInput}
             isLoading={isLoading || isPendingToolCall}
-            onStop={stop}
+            onStop={handleStop}
             onFocus={isFirstTime ? undefined : handleFocus}
           />
         </div>
