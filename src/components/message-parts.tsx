@@ -62,6 +62,43 @@ import { ModelProviderIcon } from "ui/model-provider-icon";
 import { appStore } from "@/app/store";
 import { BACKGROUND_COLORS, EMOJI_DATA } from "lib/const";
 
+// Helpers to extract image URLs from plain text
+const IMAGE_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".bmp",
+  ".ico",
+  ".tiff",
+  ".tif",
+];
+function looksLikeImageUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.startsWith("data:image/")) return true;
+  return IMAGE_EXTENSIONS.some((ext) => lower.includes(ext));
+}
+function extractImageUrls(text: string): string[] {
+  if (!text) return [];
+  const urls = new Set<string>();
+  const urlRegex = /(https?:\/\/[^\s)\]\"']+)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = urlRegex.exec(text)) !== null) {
+    const candidate = match[1];
+    if (looksLikeImageUrl(candidate)) {
+      urls.add(candidate);
+    }
+  }
+  // Also capture data URLs pasted directly
+  const dataUrlRegex = /(data:image\/[a-zA-Z0-9+.-]+;base64,[a-zA-Z0-9+/=]+)/gi;
+  while ((match = dataUrlRegex.exec(text)) !== null) {
+    urls.add(match[1]);
+  }
+  return Array.from(urls);
+}
+
 type MessagePart = UIMessage["parts"][number];
 type TextMessagePart = Extract<MessagePart, { type: "text" }>;
 type AssistMessagePart = Extract<MessagePart, { type: "text" }>;
@@ -120,6 +157,7 @@ export const UserMessagePart = memo(
     const [expanded, setExpanded] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const scrolledRef = useRef(false);
+    const imageUrls = useMemo(() => extractImageUrls(part.text), [part.text]);
 
     const isLongText = part.text.length > MAX_TEXT_LENGTH;
     const displayText =
@@ -188,6 +226,19 @@ export const UserMessagePart = memo(
           <p className={cn("whitespace-pre-wrap text-sm break-words")}>
             {displayText}
           </p>
+          {imageUrls.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {imageUrls.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${message.id}-img-${i}`}
+                  src={src}
+                  alt="image"
+                  className="max-h-48 rounded-md border bg-background"
+                />
+              ))}
+            </div>
+          )}
           {isLongText && (
             <Button
               variant="ghost"
@@ -291,6 +342,7 @@ export const AssistMessagePart = memo(function AssistMessagePart({
   const [isDeleting, setIsDeleting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const metadata = message.metadata as ChatMetadata | undefined;
+  const imageUrls = useMemo(() => extractImageUrls(part.text), [part.text]);
 
   const agent = useMemo(() => {
     return agentList.find((a) => a.id === metadata?.agentId);
@@ -360,6 +412,19 @@ export const AssistMessagePart = memo(function AssistMessagePart({
         })}
       >
         <Markdown>{part.text}</Markdown>
+        {imageUrls.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-1">
+            {imageUrls.map((src, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={`${message.id}-assist-img-${i}`}
+                src={src}
+                alt="image"
+                className="max-h-56 rounded-md border bg-background"
+              />
+            ))}
+          </div>
+        )}
       </div>
       {showActions && (
         <div className="flex w-full">

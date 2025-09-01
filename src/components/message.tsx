@@ -22,8 +22,16 @@ import {
 } from "lucide-react";
 import { Button } from "ui/button";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
 import { extractMCPToolId } from "lib/ai/mcp/mcp-tool-id";
+import {
+  File as FileIcon,
+  FileText,
+  Image as ImageIcon,
+  Music,
+  Video,
+  Archive,
+  Code,
+} from "lucide-react";
 
 interface Props {
   message: UIMessage;
@@ -316,22 +324,96 @@ const PurePreviewMessage = ({
               );
             }
 
+            // Render user file parts (basic preview)
+            if (isUserMessage && part.type === "file") {
+              const mediaType = (part as any).mediaType as string | undefined;
+              const url = (part as any).url as string | undefined;
+              const base64 = (part as any).base64 as string | undefined;
+              if (mediaType?.startsWith("image/") && (url || base64)) {
+                const src = url
+                  ? url
+                  : base64
+                    ? base64.startsWith("data:")
+                      ? base64
+                      : `data:${mediaType};base64,${base64}`
+                    : undefined;
+                if (src) {
+                  return (
+                    <div
+                      key={key}
+                      className="rounded-lg overflow-hidden border"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt={mediaType}
+                        className="max-w-full h-auto"
+                      />
+                    </div>
+                  );
+                }
+              }
+              const mime = (mediaType || "").toLowerCase();
+              const icon = mime.startsWith("image/") ? (
+                <ImageIcon className="h-3.5 w-3.5" />
+              ) : mime.startsWith("audio/") ? (
+                <Music className="h-3.5 w-3.5" />
+              ) : mime.startsWith("video/") ? (
+                <Video className="h-3.5 w-3.5" />
+              ) : mime === "application/pdf" ||
+                mime.startsWith("text/") ||
+                mime.includes("msword") ||
+                mime.includes("officedocument") ? (
+                <FileText className="h-3.5 w-3.5" />
+              ) : mime.includes("zip") ||
+                mime.includes("x-7z") ||
+                mime.includes("x-rar") ||
+                mime.includes("x-tar") ? (
+                <Archive className="h-3.5 w-3.5" />
+              ) : mime.includes("javascript") ||
+                mime.includes("json") ||
+                mime.includes("typescript") ||
+                mime.includes("xml") ||
+                mime.includes("csv") ? (
+                <Code className="h-3.5 w-3.5" />
+              ) : (
+                <FileIcon className="h-3.5 w-3.5" />
+              );
+              return (
+                <div
+                  key={key}
+                  className="rounded-md border bg-input/50 px-2 py-1 text-xs text-muted-foreground inline-flex items-center gap-2"
+                >
+                  <div className="p-1 bg-background/60 rounded text-muted-foreground">
+                    {icon}
+                  </div>
+                  <span className="font-medium truncate max-w-[200px]">
+                    {(part as any).filename || "attachment"}
+                  </span>
+                  <span>{mediaType || "file"}</span>
+                </div>
+              );
+            }
+
             // Render assistant file/image parts
             if (!isUserMessage && part.type === "file") {
               const mediaType = (part as any).mediaType as string | undefined;
               const base64 = (part as any).base64 as string | undefined;
-              if (mediaType?.startsWith("image/") && base64) {
-                const src = base64.startsWith("data:")
-                  ? base64
-                  : `data:${mediaType};base64,${base64}`;
+              const url = (part as any).url as string | undefined;
+              const src = url
+                ? url
+                : base64
+                  ? base64.startsWith("data:")
+                    ? base64
+                    : `data:${mediaType};base64,${base64}`
+                  : undefined;
+              if (mediaType?.startsWith("image/") && src) {
                 return (
                   <div key={key} className="rounded-lg overflow-hidden border">
-                    <Image
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={src}
                       alt={mediaType}
-                      width={1024}
-                      height={1024}
-                      unoptimized
                       className="max-w-full h-auto"
                     />
                   </div>

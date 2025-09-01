@@ -8,9 +8,8 @@ import {
   Square,
   XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "ui/button";
-import { notImplementedToast } from "ui/shared-toast";
 import { UIMessage, UseChatHelpers } from "@ai-sdk/react";
 import { SelectModel } from "./select-model";
 import { appStore } from "@/app/store";
@@ -19,6 +18,15 @@ import { ChatMention, ChatModel } from "app-types/chat";
 import dynamic from "next/dynamic";
 import { ToolModeDropdown } from "./tool-mode-dropdown";
 import { RiImageCircleAiFill } from "react-icons/ri";
+import {
+  File as FileIcon,
+  FileText,
+  Image as ImageIcon,
+  Music,
+  Video,
+  Archive,
+  Code,
+} from "lucide-react";
 
 import { ToolSelectDropdown } from "./tool-select-dropdown";
 import { Tooltip, TooltipContent, TooltipTrigger } from "ui/tooltip";
@@ -105,6 +113,8 @@ export default function PromptInput({
   }, [providers, chatModel]);
 
   const editorRef = useRef<Editor | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   const setChatModel = useCallback(
     (model: ChatModel) => {
@@ -209,20 +219,71 @@ export default function PromptInput({
     [addMention],
   );
 
-  const submit = () => {
+  const toDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const renderFileIcon = (file: File) => {
+    const mime = (file.type || "").toLowerCase();
+    if (mime.startsWith("image/")) return <ImageIcon className="h-4 w-4" />;
+    if (mime.startsWith("audio/")) return <Music className="h-4 w-4" />;
+    if (mime.startsWith("video/")) return <Video className="h-4 w-4" />;
+    if (
+      mime === "application/pdf" ||
+      mime.startsWith("text/") ||
+      mime.includes("msword") ||
+      mime.includes("officedocument")
+    )
+      return <FileText className="h-4 w-4" />;
+    if (
+      mime.includes("zip") ||
+      mime.includes("x-7z") ||
+      mime.includes("x-rar") ||
+      mime.includes("x-tar")
+    )
+      return <Archive className="h-4 w-4" />;
+    if (
+      mime.includes("javascript") ||
+      mime.includes("json") ||
+      mime.includes("typescript") ||
+      mime.includes("xml") ||
+      mime.includes("csv")
+    )
+      return <Code className="h-4 w-4" />;
+    return <FileIcon className="h-4 w-4" />;
+  };
+
+  const submit = async () => {
     if (isLoading) return;
     const userMessage = input?.trim() || "";
-    if (userMessage.length === 0) return;
+    if (userMessage.length === 0 && files.length === 0) return;
+    const fileParts = await Promise.all(
+      files.map(async (f) => {
+        const url = await toDataUrl(f);
+        return {
+          type: "file",
+          filename: f.name,
+          mediaType: f.type || "application/octet-stream",
+          url,
+        } as any;
+      }),
+    );
+
     setInput("");
-    sendMessage({
-      role: "user",
-      parts: [
-        {
-          type: "text",
-          text: userMessage,
-        },
-      ],
-    });
+    setFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const parts: any[] = [];
+    if (userMessage.length > 0) {
+      parts.push({ type: "text", text: userMessage });
+    }
+    parts.push(...fileParts);
+
+    sendMessage({ role: "user", parts });
   };
 
   // Handle ESC key to clear mentions
@@ -327,15 +388,77 @@ export default function PromptInput({
                   onFocus={onFocus}
                 />
               </div>
+              {files.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-1">
+                  {files.map((file, idx) => {
+                    const isImage = (file.type || "").startsWith("image/");
+                    const previewUrl = isImage
+                      ? URL.createObjectURL(file)
+                      : undefined;
+                    return (
+                      <div
+                        key={`${file.name}-${idx}`}
+                        className="flex items-center gap-2 rounded-md border bg-input/50 px-2 py-1"
+                      >
+                        {isImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={previewUrl}
+                            alt={file.name}
+                            className="h-10 w-10 rounded object-cover"
+                            onLoad={() => {
+                              if (previewUrl) URL.revokeObjectURL(previewUrl);
+                            }}
+                          />
+                        ) : (
+                          <div className="p-1 bg-background/60 rounded text-muted-foreground">
+                            {renderFileIcon(file)}
+                          </div>
+                        )}
+                        <span className="text-xs truncate max-w-[160px]">
+                          {file.name}
+                        </span>
+                        <Button
+                          variant={"ghost"}
+                          size={"icon"}
+                          className="rounded-full hover:bg-input! flex-shrink-0 h-6 w-6 p-0"
+                          onClick={() => {
+                            setFiles((prev) =>
+                              prev.filter((_, i) => i !== idx),
+                            );
+                          }}
+                          aria-label={`remove ${file.name}`}
+                        >
+                          <XIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex w-full items-center z-30">
                 <Button
                   variant={"ghost"}
                   size={"sm"}
                   className="rounded-full hover:bg-input! p-2!"
-                  onClick={notImplementedToast}
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   <PlusIcon />
                 </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files.length > 0) {
+                      setFiles((prev) => [
+                        ...prev,
+                        ...Array.from(event.target.files || []),
+                      ]);
+                    }
+                  }}
+                />
 
                 {!toolDisabled && (
                   <>

@@ -174,6 +174,105 @@ export async function POST(request: Request) {
           null;
         setExaApiKey(exaKey);
 
+        // Basic attachment preprocessing: if markitdown MCP is available,
+        // send file attachments to markitdown and replace them with markdown text.
+        try {
+          // Find a markitdown tool if available in current MCP tools
+          const markitdownEntry = Object.entries(MCP_TOOLS || {}).find(
+            ([key, tool]: [string, any]) =>
+              (tool?._mcpServerName || "")
+                .toString()
+                .toLowerCase()
+                .includes("markitdown") ||
+              key.toLowerCase().includes("markitdown"),
+          );
+
+          // Extract file parts from the latest user message
+          const fileParts = (message?.parts || []).filter(
+            (p: any) => p && p.type === "file",
+          );
+
+          if (markitdownEntry && fileParts.length > 0) {
+            const [, tool]: [string, any] = markitdownEntry;
+            const serverName: string = tool._mcpServerName;
+            const originToolName: string = tool._originToolName;
+
+            // Prefer http(s) URLs if present; otherwise fallback to data URIs/base64
+            const urls = fileParts
+              .map((p: any) => p?.url as string | undefined)
+              .filter(
+                (u: string | undefined): u is string =>
+                  !!u && /^https?:\/\//i.test(u),
+              );
+
+            const dataFiles = fileParts
+              .map((p: any) => {
+                const filename = (p?.filename as string) || "attachment";
+                const mediaType =
+                  (p?.mediaType as string) || "application/octet-stream";
+                const url: string | undefined = p?.url;
+                const base64: string | undefined = (p as any)?.base64;
+
+                if (typeof url === "string" && url.startsWith("data:")) {
+                  const commaIndex = url.indexOf(",");
+                  const meta = url.slice(0, Math.max(0, commaIndex));
+                  const data = commaIndex >= 0 ? url.slice(commaIndex + 1) : "";
+                  const m = /data:(.*?);base64/i.exec(meta || "");
+                  const mime = (m && m[1]) || mediaType;
+                  return { filename, mimeType: mime, data };
+                }
+                if (typeof base64 === "string" && base64.length > 0) {
+                  return { filename, mimeType: mediaType, data: base64 };
+                }
+                return null;
+              })
+              .filter(
+                (
+                  v: any,
+                ): v is { filename: string; mimeType: string; data: string } =>
+                  !!v,
+              );
+
+            const args: Record<string, unknown> =
+              urls.length > 0
+                ? { urls }
+                : dataFiles.length > 0
+                  ? { files: dataFiles }
+                  : {};
+
+            if (Object.keys(args).length > 0) {
+              const conversion = await mcpClientsManager
+                .toolCallByServerName(serverName, originToolName, args)
+                .catch(() => null);
+
+              const contents: any[] = Array.isArray(
+                (conversion as any)?.content,
+              )
+                ? ((conversion as any).content as any[])
+                : [];
+              const convertedText = contents
+                .filter((c: any) => c?.type === "text" && c?.text)
+                .map((c: any) =>
+                  typeof c.text === "string" ? c.text : JSON.stringify(c.text),
+                )
+                .join("\n\n");
+
+              if (convertedText) {
+                // Remove file parts and append the converted text instead
+                const nonFileParts = (message.parts || []).filter(
+                  (p: any) => p?.type !== "file",
+                );
+                message.parts = [
+                  ...nonFileParts,
+                  { type: "text", text: convertedText },
+                ];
+              }
+            }
+          }
+        } catch {
+          // Fail open: ignore preprocessing errors and continue normally
+        }
+
         const inProgressToolParts = extractInProgressToolPart(message);
         if (inProgressToolParts.length) {
           await Promise.all(
