@@ -301,6 +301,7 @@
     }
   },
   "Layout": {
+    "connections": "Байланыстар",
     "workflow": "Жұмыс процесі",
     "toggleSidebar": "Бүйір панельді қосу/өшіру",
     "newChat": "Жаңа чат",
@@ -471,5 +472,15 @@
     "mcpServerCustomizationDescription": "MCP сервері қолжетімді болғанда, оның баптау нұсқаулары жүйелік нұсқауға қосылады.",
     "toolCustomizationInstructionsPlaceholder": "Құралды баптау нұсқаулары қолжетімді емес.",
     "mcpServerCustomizationPlaceholder": "мыс., Егер енгізу мәні email болса, оны әрдайым example@example.com форматында енгізіңіз."
+  },
+  "Connections": {
+    "title": "Байланыстар",
+    "createConnection": "Байланыс қосу",
+    "instanceName": "Инстанс атауы",
+    "apiKey": "API кілт",
+    "qrOrCode": "QR немесе жұптастыру коды",
+    "qrWillAppearAfterCreate": "Құрудан кейін QR немесе жұптастыру коды пайда болады.",
+    "refreshQr": "QR жаңарту",
+    "refreshTries": "{count} рет жаңартылды"
   }
 }

@@ -24,6 +24,7 @@ import {
   PlusIcon,
   Waypoints,
 } from "lucide-react";
+import { LuMessageCircleCode } from "react-icons/lu";
 import { useCallback, useState } from "react";
 import { Skeleton } from "ui/skeleton";
 import { useArchives } from "@/hooks/queries/use-archives";
@@ -93,6 +94,18 @@ export function AppSidebarMenus() {
                 <SidebarMenuButton className="font-semibold">
                   <Waypoints className="size-4" />
                   {t("Layout.workflow")}
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          </Tooltip>
+        </SidebarMenu>
+        <SidebarMenu>
+          <Tooltip>
+            <SidebarMenuItem>
+              <Link href="/connections">
+                <SidebarMenuButton className="font-semibold">
+                  <LuMessageCircleCode className="size-4" />
+                  {t("Layout.connections")}
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>

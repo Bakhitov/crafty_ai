@@ -301,6 +301,7 @@
     }
   },
   "Layout": {
+    "connections": "Каналы связи",
     "workflow": "Рабочий процесс",
     "toggleSidebar": "Переключить боковую панель",
     "newChat": "Новый чат",
@@ -472,5 +473,15 @@
     "mcpServerCustomizationDescription": "Инструкции по кастомизации MCP будут добавлены к системной подсказке, когда MCP‑сервер доступен.",
     "toolCustomizationInstructionsPlaceholder": "Инструкции по настройке инструмента недоступны.",
     "mcpServerCustomizationPlaceholder": "напр. Если входное значение — email, всегда указывайте его в формате example@example.com."
+  },
+  "Connections": {
+    "title": "Каналы связи",
+    "createConnection": "Создать канал",
+    "instanceName": "Имя канала",
+    "apiKey": "API ключ",
+    "qrOrCode": "QR или код сопряжения",
+    "qrWillAppearAfterCreate": "QR или код сопряжения появится после создания.",
+    "refreshQr": "Обновить QR",
+    "refreshTries": "Обновлений: {count}"
   }
 }

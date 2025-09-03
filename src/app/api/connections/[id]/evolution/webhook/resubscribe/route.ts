@@ -1,0 +1,67 @@
+import { getSession } from "lib/auth/server";
+import { ConnectionRepository } from "lib/db/pg/repositories/connection-repository.pg";
+import { KeyCrypto } from "lib/security/key-crypto";
+import { load } from "lib/load-env";
+
+const env = load();
+
+const EVO_API_URL_RAW = process.env.EVO_API_URL || env.EVO_API_URL;
+const EVO_API_URL =
+  EVO_API_URL_RAW && /^https?:\/\//.test(EVO_API_URL_RAW)
+    ? EVO_API_URL_RAW
+    : EVO_API_URL_RAW
+      ? `https://${EVO_API_URL_RAW}`
+      : undefined;
+
+export async function POST(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!EVO_API_URL) {
+    return new Response("EVO_API_URL is not configured", { status: 500 });
+  }
+
+  const session = await getSession();
+  const userId = session.user.id;
+  const { id } = await params;
+
+  const conn = await ConnectionRepository.findByIdAndUser(id, userId);
+  if (!conn) return new Response("Not found", { status: 404 });
+  if (
+    conn.type !== "whatsapp_evolution" ||
+    !conn.evolutionInstanceName ||
+    !conn.evolutionApikeyEncrypted
+  ) {
+    return new Response("Invalid connection", { status: 400 });
+  }
+
+  const apikey = KeyCrypto.decrypt(conn.evolutionApikeyEncrypted);
+  const headers = new Headers();
+  headers.set("Content-Type", "application/json");
+  headers.set("apikey", apikey);
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || env.NEXT_PUBLIC_BASE_URL;
+  if (!baseUrl) return new Response("Base URL not configured", { status: 500 });
+  const webhookUrl = `${baseUrl.replace(/\/$/, "")}/api/webhooks/evolution/${conn.id}`;
+
+  const res = await fetch(
+    `${EVO_API_URL}/webhook/set/${encodeURIComponent(conn.evolutionInstanceName)}`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          byEvents: false,
+          base64: true,
+        },
+      }),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  return new Response(JSON.stringify(data), {
+    status: res.status,
+    headers: { "Content-Type": "application/json" },
+  });
+}

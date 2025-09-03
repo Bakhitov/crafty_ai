@@ -18,6 +18,7 @@ import { DBWorkflow, DBEdge, DBNode } from "app-types/workflow";
 import { ApiKeysJson } from "app-types/user";
 import { UIMessage } from "ai";
 import { ChatMetadata } from "app-types/chat";
+import { EncryptedPayload } from "lib/security/key-crypto";
 
 export const ChatThreadSchema = pgTable("chat_thread", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -286,6 +287,75 @@ export const ArchiveItemSchema = pgTable(
   (t) => [index("archive_item_item_id_idx").on(t.itemId)],
 );
 
+// Connections: link Better-Chatbot with Evolution API and Chatwoot
+export const ConnectionSchema = pgTable(
+  "connection",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => UserSchema.id, { onDelete: "cascade" }),
+    type: varchar("type", {
+      enum: ["whatsapp_evolution", "chatwoot_channel"],
+    })
+      .notNull()
+      .default("whatsapp_evolution"),
+    displayName: text("display_name"),
+    status: varchar("status", {
+      enum: ["qr_required", "connecting", "open", "close", "error"],
+    })
+      .notNull()
+      .default("connecting"),
+
+    // Evolution specific
+    evolutionInstanceName: text("evolution_instance_name").unique(),
+    evolutionApikeyEncrypted: json(
+      "evolution_apikey_encrypted",
+    ).$type<EncryptedPayload | null>(),
+
+    // Chatwoot linkage (optional for WA, used later)
+    chatwootAccountId: text("chatwoot_account_id"),
+    chatwootInboxId: text("chatwoot_inbox_id"),
+    chatwootHmacEncrypted: json(
+      "chatwoot_hmac_encrypted",
+    ).$type<EncryptedPayload | null>(),
+    chatwootWebhookUrl: text("chatwoot_webhook_url"),
+
+    providerMetadata:
+      json("provider_metadata").$type<Record<string, unknown>>(),
+
+    createdAt: timestamp("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [index("connection_user_id_idx").on(t.userId)],
+);
+
+// Map Chatwoot inboxes to Better-Chatbot agents per user
+export const ChannelAgentMapSchema = pgTable(
+  "channel_agent_map",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => UserSchema.id, { onDelete: "cascade" }),
+    chatwootInboxId: text("chatwoot_inbox_id").notNull(),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => AgentSchema.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    unique().on(t.userId, t.chatwootInboxId),
+    index("channel_agent_map_inbox_idx").on(t.chatwootInboxId),
+  ],
+);
+
 export const McpOAuthSessionSchema = pgTable(
   "mcp_oauth_session",
   {
@@ -330,3 +400,5 @@ export type McpServerCustomizationEntity =
 export type ArchiveEntity = typeof ArchiveSchema.$inferSelect;
 export type ArchiveItemEntity = typeof ArchiveItemSchema.$inferSelect;
 export type BookmarkEntity = typeof BookmarkSchema.$inferSelect;
+export type ConnectionEntity = typeof ConnectionSchema.$inferSelect;
+export type ChannelAgentMapEntity = typeof ChannelAgentMapSchema.$inferSelect;
