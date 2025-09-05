@@ -29,6 +29,7 @@ import {
 import { Card } from "ui/card";
 import { ModelProviderIcon } from "ui/model-provider-icon";
 import { GoTrash } from "react-icons/go";
+import { Switch } from "ui/switch";
 
 type ProviderKey =
   | "openai"
@@ -36,7 +37,8 @@ type ProviderKey =
   | "anthropic"
   | "xai"
   | "openrouter"
-  | "exa";
+  | "exa"
+  | "gateway";
 
 const PROVIDERS: { id: ProviderKey; name: string }[] = [
   { id: "openai", name: "OpenAI" },
@@ -45,6 +47,7 @@ const PROVIDERS: { id: ProviderKey; name: string }[] = [
   { id: "xai", name: "XAI" },
   { id: "openrouter", name: "OpenRouter" },
   { id: "exa", name: "Exa" },
+  { id: "gateway", name: "AI Gateway" },
 ];
 
 export function ApiKeysContent() {
@@ -54,6 +57,11 @@ export function ApiKeysContent() {
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: preferences, mutate: mutatePreferences } = useSWR<any>(
+    "/api/user/preferences",
+    fetcher,
+  );
 
   const { data, mutate, isLoading } = useSWR<Record<string, any>>(
     "/api/user/keys",
@@ -82,6 +90,88 @@ export function ApiKeysContent() {
     }
   };
 
+  const onToggleGateway = async (checked: boolean) => {
+    try {
+      const hasGateway = Boolean((data as any)?.gateway?.length);
+      const hasOpenRouter = Boolean((data as any)?.openrouter?.length);
+
+      const next = (() => {
+        const base: any = { ...(preferences || {}) };
+        if (checked) {
+          return {
+            ...base,
+            useAIGateway: true,
+            ...(hasOpenRouter ? { useOpenRouter: false } : {}),
+          };
+        }
+        if (hasOpenRouter) {
+          return { ...base, useAIGateway: false, useOpenRouter: true };
+        }
+        if (hasGateway) {
+          toast.info(
+            t("Chat.ChatPreferences.priorityMustBeOne", {
+              default:
+                "Должен быть выбран один приоритетный маршрут. Отключить AI Gateway нельзя, пока нет альтернативы.",
+            }),
+          );
+          return { ...base, useAIGateway: true } as any;
+        }
+        return base;
+      })();
+      const res = await fetch("/api/user/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success(t("Common.saved"));
+      await mutatePreferences();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save");
+    }
+  };
+
+  const onToggleOpenRouter = async (checked: boolean) => {
+    try {
+      const hasGateway = Boolean((data as any)?.gateway?.length);
+      const hasOpenRouter = Boolean((data as any)?.openrouter?.length);
+
+      const next = (() => {
+        const base: any = { ...(preferences || {}) };
+        if (checked) {
+          return {
+            ...base,
+            useOpenRouter: true,
+            ...(hasGateway ? { useAIGateway: false } : {}),
+          };
+        }
+        if (hasGateway) {
+          return { ...base, useOpenRouter: false, useAIGateway: true };
+        }
+        if (hasOpenRouter) {
+          toast.info(
+            t("Chat.ChatPreferences.priorityMustBeOne", {
+              default:
+                "Должен быть выбран один приоритетный маршрут. Отключить OpenRouter нельзя, пока нет альтернативы.",
+            }),
+          );
+          return { ...base, useOpenRouter: true } as any;
+        }
+        return base;
+      })();
+      const res = await fetch("/api/user/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success(t("Common.saved"));
+      await mutatePreferences();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save");
+    }
+  };
+
   const onDelete = async (prov: string, lbl?: string | null) => {
     try {
       const res = await fetch("/api/user/keys", {
@@ -91,7 +181,31 @@ export function ApiKeysContent() {
       });
       if (!res.ok) throw new Error(await res.text());
       toast.success(t("Common.deleted"));
-      await mutate();
+      const keys = await mutate();
+
+      // Если удалённый провайдер был приоритетным — сбросить/переключить приоритет
+      const hasGateway = Boolean((keys as any)?.gateway?.length);
+      const hasOpenRouter = Boolean((keys as any)?.openrouter?.length);
+
+      let next: any = null;
+      if (prov === "gateway" && preferences?.useAIGateway) {
+        next = { ...(preferences || {}), useAIGateway: false };
+        if (hasOpenRouter) next.useOpenRouter = true;
+      }
+      if (prov === "openrouter" && preferences?.useOpenRouter) {
+        next = { ...(preferences || {}), useOpenRouter: false };
+        if (hasGateway) next.useAIGateway = true;
+      }
+
+      if (next) {
+        const upd = await fetch("/api/user/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(next),
+        });
+        if (!upd.ok) throw new Error(await upd.text());
+        await mutatePreferences();
+      }
     } catch (e: any) {
       toast.error(e?.message || "Failed to delete");
     }
@@ -109,6 +223,65 @@ export function ApiKeysContent() {
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="p-4 md:p-6">
           <div className="flex flex-col gap-4">
+            {(() => {
+              const hasGateway = Boolean((data as any)?.gateway?.length);
+              const hasOpenRouter = Boolean((data as any)?.openrouter?.length);
+              if (!hasGateway && !hasOpenRouter) return null;
+              return (
+                <div className="flex flex-col gap-3 border rounded-lg p-3">
+                  <div className="flex flex-col gap-1">
+                    <Label>
+                      {t("Chat.ChatPreferences.priorityRouting", {
+                        default: "Приоритет маршрутизации",
+                      })}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t("Chat.ChatPreferences.priorityRoutingDesc", {
+                        default:
+                          "Выберите один маршрут. Если включить один — другой отключится автоматически. Переключатели видны только при наличии ключа.",
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {hasGateway && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-sm">AI Gateway</span>
+                          <span className="text-xs text-muted-foreground">
+                            {t("Chat.ChatPreferences.aiGatewayHint", {
+                              default:
+                                "Использовать ключ AI Gateway (provider: gateway)",
+                            })}
+                          </span>
+                        </div>
+                        <Switch
+                          checked={Boolean(preferences?.useAIGateway)}
+                          onCheckedChange={onToggleGateway as any}
+                        />
+                      </div>
+                    )}
+                    {hasOpenRouter && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-sm">OpenRouter</span>
+                          <span className="text-xs text-muted-foreground">
+                            {t("Chat.ChatPreferences.openrouterHint", {
+                              default:
+                                "Использовать ключ OpenRouter (provider: openrouter)",
+                            })}
+                          </span>
+                        </div>
+                        <Switch
+                          checked={Boolean(preferences?.useOpenRouter)}
+                          onCheckedChange={onToggleOpenRouter as any}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex flex-col gap-2">
               <Label>{t("Common.provider")}</Label>
               <Select

@@ -292,7 +292,11 @@
       "apiKeysDescription": "Пайдаланушы провайдер кілттерін және қосымша Base URL-ді басқарыңыз.",
       "existingKeys": "Бар кілттер",
       "noKeys": "Әзірге кілттер жоқ",
-      "baseUrlHint": "Міндетті емес. Провайдердің әдепкі endpoint-ін ауыстырады."
+      "baseUrlHint": "Міндетті емес. Провайдердің әдепкі endpoint-ін ауыстырады.",
+      "aiGatewayHint": "AI Gateway кілтін қолданыңыз",
+      "openrouterHint": "OpenRouter кілтін қолданыңыз",
+      "priorityRouting": "Ортақ провайдер LLM",
+      "priorityRoutingDesc": "Қолданылатын кілттерді таңдаңыз"
     },
     "MissingKeys": {
       "title": "API кілт жетіспейді",

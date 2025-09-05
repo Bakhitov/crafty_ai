@@ -292,7 +292,11 @@
       "apiKeysDescription": "Управляйте пользовательскими ключами провайдеров и опциональным Base URL.",
       "existingKeys": "Существующие ключи",
       "noKeys": "Ключей пока нет",
-      "baseUrlHint": "Необязательно. Переопределяет базовый endpoint провайдера."
+      "baseUrlHint": "Необязательно. Переопределяет базовый endpoint провайдера.",
+      "aiGatewayHint": "Использовать ключ AI Gateway",
+      "openrouterHint": "Использовать ключ OpenRouter",
+      "priorityRouting": "Общие провайдеры LLM",
+      "priorityRoutingDesc": "Выберите чьи ключи будут использоваться"
     },
     "MissingKeys": {
       "title": "Не хватает ключа",

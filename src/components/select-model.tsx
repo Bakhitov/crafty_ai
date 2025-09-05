@@ -4,7 +4,6 @@ import { appStore } from "@/app/store";
 import { useChatModels } from "@/hooks/queries/use-chat-models";
 import { ChatModel } from "app-types/chat";
 import { CheckIcon, ChevronDown } from "lucide-react";
-import { RiImageCircleAiFill } from "react-icons/ri";
 import { Fragment, memo, PropsWithChildren, useEffect, useState } from "react";
 import { Button } from "ui/button";
 
@@ -25,17 +24,18 @@ interface SelectModelProps {
   align?: "start" | "end";
   currentModel?: ChatModel;
   showProvider?: boolean;
+  /**
+   * text: показывать только текстовые модели (без supportsImage)
+   * image: показывать только image-модели (supportsImage === true)
+   */
+  mode?: "text" | "image";
 }
 
 export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
   const [open, setOpen] = useState(false);
   const { data: providers } = useChatModels();
   const [model, setModel] = useState(props.currentModel);
-  const supportsImageForCurrent = (() => {
-    const p = providers?.find((p) => p.provider === model?.provider);
-    const m = p?.models.find((m) => m.name === model?.model);
-    return m?.supportsImage;
-  })();
+  // image-capable indication is no longer shown in the main selector
 
   useEffect(() => {
     const modelToUse = props.currentModel ?? appStore.getState().chatModel;
@@ -63,9 +63,7 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
                 />
               )}
               <p data-testid="selected-model-name">{model?.model || "model"}</p>
-              {supportsImageForCurrent && (
-                <RiImageCircleAiFill className="size-3 text-muted-foreground" />
-              )}
+              {/* removed image capability icon from main chat model selector */}
             </div>
             <ChevronDown className="size-3" />
           </Button>
@@ -85,19 +83,21 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
             placeholder="search model..."
             data-testid="model-search-input"
           />
-          <CommandList className="p-2">
+          <CommandList className="p-2 max-h-80 overflow-auto">
             <CommandEmpty>No results found.</CommandEmpty>
-            {providers?.map((provider, i) => (
+            {providers?.map((provider, i) => {
+              const models = (provider.models || []).filter((item) =>
+                (props.mode || "text") === "image" ? item.supportsImage : !item.supportsImage,
+              );
+              if (models.length === 0) return null;
+              return (
               <Fragment key={provider.provider}>
                 <CommandGroup
                   heading={<ProviderHeader provider={provider.provider} />}
                   className="pb-4 group"
-                  onWheel={(e) => {
-                    e.stopPropagation();
-                  }}
                   data-testid={`model-provider-${provider.provider}`}
                 >
-                  {provider.models.map((item) => (
+                  {models.map((item) => (
                     <CommandItem
                       key={item.name}
                       className="cursor-pointer"
@@ -125,9 +125,6 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
                         <div className="ml-3" />
                       )}
                       <span className="pr-1">{item.name}</span>
-                      {item.supportsImage && (
-                        <RiImageCircleAiFill className="size-3 text-muted-foreground" />
-                      )}
                       {item.isToolCallUnsupported && (
                         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
                           No tools
@@ -138,7 +135,8 @@ export const SelectModel = (props: PropsWithChildren<SelectModelProps>) => {
                 </CommandGroup>
                 {i < providers?.length - 1 && <CommandSeparator />}
               </Fragment>
-            ))}
+              );
+            })}
           </CommandList>
         </Command>
       </PopoverContent>

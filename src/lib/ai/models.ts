@@ -7,12 +7,14 @@ import { anthropic, createAnthropic } from "@ai-sdk/anthropic";
 import { xai, createXai } from "@ai-sdk/xai";
 import { openrouter, createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { LanguageModel } from "ai";
+import { createGateway } from "@ai-sdk/gateway";
 import {
   createOpenAICompatibleModels,
   openaiCompatibleModelsSafeParse,
 } from "./create-openai-compatiable";
 import { ChatModel } from "app-types/chat";
 import { UserKeyService } from "lib/services/user-key.service";
+import { userRepository } from "lib/db/repository";
 
 const ollama = createOllama({
   baseURL: process.env.OLLAMA_BASE_URL || "http://localhost:11434/api",
@@ -100,7 +102,49 @@ const fallbackModel = staticModels.openai["gpt-4.1"];
 const imageOnlyModelsByProvider: Record<string, string[]> = {
   openai: ["gpt-image-1", "dall-e-3", "dall-e-2"],
   google: ["imagen-3.0-generate-002"],
-  xai: ["grok-2-image"],
+  fal: ["fal-ai/flux/dev", "fal-ai/flux-pro", "fal-ai/flux-schnell"],
+  luma: ["photon-1", "photon-flash"],
+  replicate: [
+    "black-forest-labs/flux-1.1-pro-ultra",
+    "black-forest-labs/flux-1.1-pro",
+    "black-forest-labs/flux-dev",
+    "black-forest-labs/flux-pro",
+    "black-forest-labs/flux-schnell",
+    "bytedance/sdxl-lightning-4step",
+    "fofr/aura-flow",
+    "fofr/latent-consistency-model",
+    "fofr/realvisxl-v3-multi-controlnet-lora",
+    "fofr/sdxl-emoji",
+    "fofr/sdxl-multi-controlnet-lora",
+    "ideogram-ai/ideogram-v2-turbo",
+    "ideogram-ai/ideogram-v2",
+    "lucataco/dreamshaper-xl-turbo",
+    "lucataco/open-dalle-v1.1",
+    "lucataco/realvisxl-v2.0",
+    "lucataco/realvisxl2-lcm",
+    "nvidia/sana",
+    "playgroundai/playground-v2.5-1024px-aesthetic",
+    "recraft-ai/recraft-v3-svg",
+    "recraft-ai/recraft-v3",
+    "stability-ai/stable-diffusion-3.5-large-turbo",
+    "stability-ai/stable-diffusion-3.5-large",
+    "stability-ai/stable-diffusion-3.5-medium",
+    "tstramer/material-diffusion",
+  ],
+};
+
+export const isImageOnlyModel = (model?: ChatModel): boolean => {
+  if (!model) return false;
+  const { provider, model: name } = model;
+  return Boolean(imageOnlyModelsByProvider[provider]?.includes(name));
+};
+
+export const isImageCapableModel = (model?: ChatModel): boolean => {
+  if (!model) return false;
+  const entry = customModelProvider.modelsInfo
+    .find((p) => p.provider === model.provider)
+    ?.models.find((m) => m.name === model.model);
+  return Boolean(entry?.supportsImage);
 };
 
 export const customModelProvider = {
@@ -149,7 +193,50 @@ export const customModelProvider = {
     const provider = model.provider;
     const modelName = model.model;
 
-    // Try to load user's API key by provider
+    // 1) Try to route via AI Gateway when enabled and key exists
+    try {
+      const preferences = (await userRepository.getPreferences(userId)) || {};
+      const useGateway = Boolean(preferences.useAIGateway);
+      const gatewayKeyMeta = await UserKeyService.getKeyWithMeta(
+        userId,
+        "gateway",
+      );
+      const gatewayApiKey = (gatewayKeyMeta?.apiKey || process.env.AI_GATEWAY_API_KEY || "").trim();
+      if (useGateway && gatewayApiKey) {
+        const gatewayProvider = createGateway({
+          apiKey: gatewayApiKey,
+          baseURL: gatewayKeyMeta?.baseUrl || undefined,
+        });
+        // Expect model identifier in format "provider/model"
+        const compositeModelId = `${provider}/${modelName}`;
+        return gatewayProvider(compositeModelId);
+      }
+    } catch {
+      // ignore and fallback to per-provider keys
+    }
+
+    // 1.2) Try to route via OpenRouter when enabled and key exists
+    try {
+      const preferences = (await userRepository.getPreferences(userId)) || {};
+      const useOpenRouter = Boolean(preferences.useOpenRouter);
+      const orKeyMeta = await UserKeyService.getKeyWithMeta(
+        userId,
+        "openrouter",
+      );
+      const orApiKey = (orKeyMeta?.apiKey || process.env.OPENROUTER_API_KEY || "").trim();
+      if (useOpenRouter && orApiKey) {
+        // If a user chooses OpenRouter priority, we expect model names be OpenRouter-compatible
+        // and use the OpenRouter provider directly here.
+        return createOpenRouter({
+          apiKey: orApiKey,
+          baseURL: orKeyMeta?.baseUrl || undefined,
+        })(`${provider}/${modelName}`);
+      }
+    } catch {
+      // ignore and fallback to per-provider keys
+    }
+
+    // 2) Try to load user's API key by provider
     const providerKeyMap: Record<string, string> = {
       openai: "openai",
       google: "google",

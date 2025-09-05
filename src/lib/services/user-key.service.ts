@@ -40,8 +40,9 @@ export const UserKeyService = {
       return null;
     }
 
-    await serverCache.set(keyName, plain, CACHE_TTL_MS);
-    return plain;
+    const trimmed = (plain || "").trim();
+    await serverCache.set(keyName, trimmed, CACHE_TTL_MS);
+    return trimmed;
   },
 
   async getKeyWithMeta(
@@ -53,13 +54,15 @@ export const UserKeyService = {
     const active = (list || []).find((k) => k.isActive !== false);
     if (!active) return null;
     try {
-      const apiKey = KeyCrypto.decrypt({
+      const apiKeyRaw = KeyCrypto.decrypt({
         cipher: active.cipher,
         iv: active.iv,
         tag: active.tag,
         version: active.version,
       });
-      return { apiKey, baseUrl: active.baseUrl };
+      const apiKey = (apiKeyRaw || "").trim();
+      const baseUrl = (active.baseUrl || undefined)?.trim() || active.baseUrl;
+      return { apiKey, baseUrl };
     } catch {
       return null;
     }

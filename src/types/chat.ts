@@ -97,6 +97,20 @@ export const chatApiSchemaRequestBodySchema = z.object({
   mentions: z.array(ChatMentionSchema).optional(),
   allowedMcpServers: z.record(z.string(), AllowedMCPServerZodSchema).optional(),
   allowedAppDefaultToolkit: z.array(z.string()).optional(),
+  imageSettings: z
+    .object({
+      enabled: z.boolean().optional(),
+      engine: z
+        .enum(["auto", "openai", "google", "fal", "replicate", "luma"])
+        .optional(),
+      imageModel: z.string().optional(),
+      size: z.string().optional(),
+      style: z.string().optional(),
+      quality: z.string().optional(),
+      aspectRatio: z.string().optional(),
+      providerOptions: z.record(z.string(), z.any()).optional(),
+    })
+    .optional(),
 });
 
 export type ChatApiSchemaRequestBody = z.infer<

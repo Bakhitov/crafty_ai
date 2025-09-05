@@ -6,9 +6,20 @@ import {
   stepCountIs,
   streamText,
   UIMessage,
+  experimental_generateImage,
 } from "ai";
 
-import { customModelProvider, isToolCallUnsupportedModel } from "lib/ai/models";
+import {
+  customModelProvider,
+  isToolCallUnsupportedModel,
+  isImageOnlyModel,
+  isImageCapableModel,
+} from "lib/ai/models";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createFal } from "@ai-sdk/fal";
+import { createLuma } from "@ai-sdk/luma";
+import { createReplicate } from "@ai-sdk/replicate";
 
 import { mcpClientsManager } from "lib/ai/mcp/mcp-manager";
 
@@ -70,6 +81,7 @@ export async function POST(request: Request) {
       allowedAppDefaultToolkit,
       allowedMcpServers,
       mentions = [],
+      imageSettings,
     } = chatApiSchemaRequestBodySchema.parse(json);
 
     const model = await customModelProvider.getModelForUser(
@@ -129,6 +141,8 @@ export async function POST(request: Request) {
       toolCount: 0,
       chatModel: chatModel,
     };
+
+    let generatedImageMessage: UIMessage | null = null;
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -341,6 +355,153 @@ export async function POST(request: Request) {
         );
         logger.info(`model: ${chatModel?.provider}/${chatModel?.model}`);
 
+        // If user explicitly enabled image generation, or current selection is image-capable/image-only, run image generation branch
+        const shouldGenerateImage = Boolean(imageSettings?.enabled) ||
+          isImageOnlyModel(chatModel) || isImageCapableModel(chatModel);
+
+        if (shouldGenerateImage) {
+          const promptText = (message.parts || [])
+            .filter((p: any) => p?.type === "text")
+            .map((p: any) => p.text)
+            .join("\n")
+            .trim();
+
+          // Select engine (default auto→by provider)
+          let engine = (imageSettings?.engine || chatModel?.provider || "openai").toLowerCase();
+          if (engine === "auto") {
+            engine = (chatModel?.provider || "openai").toLowerCase();
+          }
+
+          const size = (imageSettings?.size as any) || undefined;
+          const aspectRatio = (imageSettings?.aspectRatio as any) || undefined;
+          const extraProviderOptions = imageSettings?.providerOptions || {};
+
+          let imageBase64 = "";
+          let imageMediaType = "image/png";
+
+          if (engine === "openai") {
+          const keyMeta = await UserKeyService.getKeyWithMeta(session.user.id, "openai");
+          const apiKey = keyMeta?.apiKey || process.env.OPENAI_API_KEY || "";
+          if (!apiKey) {
+            const hint = userPreferences?.useAIGateway || userPreferences?.useOpenRouter
+              ? " (AI Gateway/OpenRouter не поддерживают генерацию изображений; требуется ключ OpenAI)"
+              : "";
+            throw new Error(`User OpenAI key is not configured${hint}`);
+          }
+          const openaiWithKey = createOpenAI({ apiKey, baseURL: keyMeta?.baseUrl || undefined });
+
+          const providerOptions: Record<string, any> = { openai: {} };
+            const modelName = imageSettings?.imageModel || chatModel?.model || "gpt-image-1";
+            if (modelName === "dall-e-3" && imageSettings?.style) {
+              providerOptions.openai.style = imageSettings.style;
+            }
+          if (modelName === "dall-e-3" || modelName === "dall-e-2") {
+            let mappedQuality = imageSettings?.quality;
+              if (mappedQuality === "low" || mappedQuality === "medium") mappedQuality = "standard";
+              else if (mappedQuality === "high" || mappedQuality === "auto") mappedQuality = "hd";
+              if (mappedQuality === "standard" || mappedQuality === "hd") providerOptions.openai.quality = mappedQuality;
+            }
+
+          const { image } = await experimental_generateImage({
+              model: openaiWithKey.image(modelName),
+              prompt: promptText,
+              ...(size ? { size } : {}),
+              ...(aspectRatio ? { aspectRatio } : {}),
+              providerOptions: { ...providerOptions, ...extraProviderOptions },
+            });
+            imageBase64 = image.base64;
+            imageMediaType = image.mediaType;
+          } else if (engine === "google") {
+            const keyMeta = await UserKeyService.getKeyWithMeta(session.user.id, "google");
+            const apiKey = keyMeta?.apiKey || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
+            if (!apiKey) {
+              const hint = userPreferences?.useAIGateway || userPreferences?.useOpenRouter
+                ? " (AI Gateway/OpenRouter не поддерживают генерацию изображений; требуется ключ Google Generative AI)"
+                : "";
+              throw new Error(`User Google key is not configured${hint}`);
+            }
+            const googleProvider = createGoogleGenerativeAI({ apiKey, baseURL: keyMeta?.baseUrl || undefined });
+            const modelName = imageSettings?.imageModel || chatModel?.model || "imagen-3.0-generate-002";
+            const { image } = await experimental_generateImage({
+              model: googleProvider.image(modelName),
+              prompt: promptText,
+              ...(aspectRatio ? { aspectRatio } : {}),
+              providerOptions: { google: {}, ...extraProviderOptions },
+            });
+            imageBase64 = image.base64;
+            imageMediaType = image.mediaType;
+          } else if (engine === "fal") {
+            const keyMeta = await UserKeyService.getKeyWithMeta(session.user.id, "fal");
+            const apiKey = keyMeta?.apiKey || process.env.FAL_API_KEY || process.env.FAL_KEY || "";
+            const falProvider = createFal({ apiKey, baseURL: keyMeta?.baseUrl || undefined });
+            const modelName = imageSettings?.imageModel || chatModel?.model || "fal-ai/flux/dev";
+            const { image } = await experimental_generateImage({
+              model: falProvider.image(modelName),
+              prompt: promptText,
+              providerOptions: { fal: {}, ...extraProviderOptions },
+            });
+            imageBase64 = image.base64;
+            imageMediaType = image.mediaType;
+          } else if (engine === "luma") {
+            const keyMeta = await UserKeyService.getKeyWithMeta(session.user.id, "luma");
+            const apiKey = keyMeta?.apiKey || process.env.LUMA_API_KEY || "";
+            const lumaProvider = createLuma({ apiKey, baseURL: keyMeta?.baseUrl || undefined });
+            const modelName = imageSettings?.imageModel || chatModel?.model || "photon-1";
+            const { image } = await experimental_generateImage({
+              model: lumaProvider.image(modelName),
+              prompt: promptText,
+              ...(aspectRatio ? { aspectRatio } : {}),
+              providerOptions: { luma: {}, ...extraProviderOptions },
+            });
+            imageBase64 = image.base64;
+            imageMediaType = image.mediaType;
+          } else if (engine === "replicate") {
+            const keyMeta = await UserKeyService.getKeyWithMeta(session.user.id, "replicate");
+            const apiToken = keyMeta?.apiKey || process.env.REPLICATE_API_TOKEN || "";
+            if (!apiToken) throw new Error("User Replicate token is not configured");
+            const replicateProvider = createReplicate({ apiToken, baseURL: keyMeta?.baseUrl || undefined });
+            const modelName = imageSettings?.imageModel || chatModel?.model || "black-forest-labs/flux-schnell";
+            const { image } = await experimental_generateImage({
+              model: replicateProvider.image(modelName),
+            prompt: promptText,
+            ...(size ? { size } : {}),
+            ...(aspectRatio ? { aspectRatio } : {}),
+              providerOptions: { replicate: {}, ...extraProviderOptions },
+            });
+            imageBase64 = image.base64;
+            imageMediaType = image.mediaType;
+          } else {
+            throw new Error(`Selected engine '${engine}' is not implemented`);
+          }
+
+          const dataUrl = imageBase64.startsWith("data:")
+            ? imageBase64
+            : `data:${imageMediaType};base64,${imageBase64}`;
+
+          const assistantMessage: UIMessage = {
+            id: generateUUID(),
+            role: "assistant",
+            parts: [{ type: "text", text: `![image](${dataUrl})` }],
+            metadata,
+          };
+
+          // write assistant text events to stream and store for onFinish persistence
+          const streamMessageId = generateUUID();
+          dataStream.write({ type: "text-start", id: streamMessageId });
+          dataStream.write({
+            type: "text-delta",
+            id: streamMessageId,
+            delta:
+              assistantMessage.parts[0].type === "text"
+                ? (assistantMessage.parts[0] as any).text
+                : `![image](${dataUrl})`,
+          });
+          dataStream.write({ type: "text-end", id: streamMessageId });
+          dataStream.write({ type: "finish" });
+          generatedImageMessage = assistantMessage;
+          return; // skip normal text streaming
+        }
+
         const result = streamText({
           model,
           system: systemPrompt,
@@ -369,6 +530,27 @@ export async function POST(request: Request) {
       onFinish: async ({ responseMessage }) => {
         // Ensure EXA key is cleared after the conversation finishes
         clearExaApiKey();
+        if (generatedImageMessage) {
+          // Persist user message then assistant image message
+          await chatRepository.upsertMessage({
+            threadId: thread!.id,
+            role: message.role,
+            parts: message.parts.map(convertToSavePart),
+            id: message.id,
+          });
+          await chatRepository.upsertMessage({
+            threadId: thread!.id,
+            ...generatedImageMessage,
+            parts: generatedImageMessage.parts.map(convertToSavePart),
+            metadata,
+          });
+          if (agent) {
+            agentRepository.updateAgent(agent.id, session.user.id, {
+              updatedAt: new Date(),
+            } as any);
+          }
+          return;
+        }
         if (responseMessage.id == message.id) {
           await chatRepository.upsertMessage({
             threadId: thread!.id,

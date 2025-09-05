@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "ui/button";
+import { cn } from "lib/utils";
 import { UIMessage, UseChatHelpers } from "@ai-sdk/react";
 import { SelectModel } from "./select-model";
 import { appStore } from "@/app/store";
@@ -42,7 +43,8 @@ import { OpenAIIcon } from "ui/openai-icon";
 import { GrokIcon } from "ui/grok-icon";
 import { ClaudeIcon } from "ui/claude-icon";
 import { GeminiIcon } from "ui/gemini-icon";
-import { useChatModels } from "@/hooks/queries/use-chat-models";
+import { ImageSettingsPanel } from "./image-settings-panel";
+import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 
 import { EMOJI_DATA } from "lib/const";
 import { AgentSummary } from "app-types/agent";
@@ -104,13 +106,119 @@ export default function PromptInput({
     return model ?? globalModel;
   }, [model, globalModel]);
 
-  const { data: providers } = useChatModels();
-  const supportsImageForCurrent = useMemo(() => {
-    if (!providers || !chatModel) return false;
-    const p = providers.find((p) => p.provider === chatModel.provider);
-    const m = p?.models.find((m) => m.name === chatModel.model);
-    return Boolean(m?.supportsImage);
-  }, [providers, chatModel]);
+  
+
+  // Image generation settings (shown only when current model supports images)
+  const [imageSize, setImageSize] = useState<string>("1024x1024");
+  const [imageStyle, setImageStyle] = useState<string>("vivid");
+  const [imageQuality, setImageQuality] = useState<string>("high");
+  const [aspectRatio, setAspectRatio] = useState<string>("");
+  const [providerOptionsText, setProviderOptionsText] = useState<string>("");
+  const [imageEngine, setImageEngine] = useState<string>("auto");
+  const [imageModel, setImageModel] = useState<string>("");
+  const [imageEnabled, setImageEnabled] = useState<boolean>(false);
+
+  // Hashtag suggestions state
+  const hashtagPresets = useMemo(
+    () => [
+      "Product Showcase",
+      "Fashion",
+      "Food & Beverage",
+      "Tech Service",
+      "Real Estate",
+    ],
+    [],
+  );
+  const hashtagPresetMap = useMemo(
+    () => ({
+      "Product Showcase":
+        "A sleek smartphone floating in space with dynamic light rays, minimalist background, product advertisement",
+      Fashion:
+        "A stylish leather jacket on an invisible mannequin against a gradient background, high-end fashion advertisement",
+      "Food & Beverage":
+        "A refreshing iced coffee in a transparent glass with condensation, soft natural lighting, on a wooden table",
+      "Tech Service":
+        "Abstract digital network connections forming a human profile, blue gradient background, tech service advertisement",
+      "Real Estate":
+        "A modern minimalist living room with floor-to-ceiling windows, natural light, architectural advertisement",
+    }),
+    [],
+  );
+  const [showHashBar, setShowHashBar] = useState(false);
+  const [hashQuery, setHashQuery] = useState("");
+
+  const onInputChanged = useCallback(
+    (text: string) => {
+      setInput(text);
+      const m = text.match(/#([\p{L}\p{N} _-]*)$/u);
+      if (m) {
+        setShowHashBar(true);
+        setHashQuery((m[1] || "").trim());
+      } else {
+        setShowHashBar(false);
+        setHashQuery("");
+      }
+    },
+    [setInput],
+  );
+
+  const filteredHashtagPresets = useMemo(() => {
+    if (!hashQuery) return hashtagPresets;
+    const q = hashQuery.toLowerCase();
+    return hashtagPresets.filter((t) => t.toLowerCase().includes(q));
+  }, [hashtagPresets, hashQuery]);
+
+  const bestHashtagSuggestion = useMemo(() => {
+    return filteredHashtagPresets[0] || undefined;
+  }, [filteredHashtagPresets]);
+
+  const replaceHashWithPreset = useCallback(
+    (title: string) => {
+      const text = hashtagPresetMap[title] || title;
+      const r = /#([\p{L}\p{N} _-]*)$/u;
+      const base = input || "";
+      const next = r.test(base) ? base.replace(r, text) : `${base} ${text}`;
+      setInput(next.trim());
+      setShowHashBar(false);
+      setHashQuery("");
+      editorRef.current?.commands.focus();
+    },
+    [hashtagPresetMap, input, setInput],
+  );
+
+  useEffect(() => {
+    if (!showHashBar || !bestHashtagSuggestion) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Tab" || e.key === "ArrowRight") {
+        e.preventDefault();
+        e.stopPropagation();
+        replaceHashWithPreset(bestHashtagSuggestion);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true } as any);
+  }, [showHashBar, bestHashtagSuggestion, replaceHashWithPreset]);
+
+  const sizeOptionsByModel: Record<string, { label: string; value: string }[]> = {
+    "dall-e-3": [
+      { label: "1:1 (1024x1024)", value: "1024x1024" },
+      { label: "16:9 (1792x1024)", value: "1792x1024" },
+      { label: "9:16 (1024x1792)", value: "1024x1792" },
+    ],
+    "gpt-image-1": [
+      { label: "1:1 (1024x1024)", value: "1024x1024" },
+      { label: "3:2 (1536x1024)", value: "1536x1024" },
+      { label: "2:3 (1024x1536)", value: "1024x1536" },
+    ],
+  };
+
+  useEffect(() => {
+    if (!chatModel) return;
+    const sizes = sizeOptionsByModel[chatModel.model]?.map((s) => s.value) || [];
+    if (sizes.length > 0 && !sizes.includes(imageSize)) {
+      setImageSize(sizes[0]);
+    }
+  }, [chatModel?.model]);
 
   const editorRef = useRef<Editor | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -259,7 +367,25 @@ export default function PromptInput({
 
   const submit = async () => {
     if (isLoading) return;
-    const userMessage = input?.trim() || "";
+    // Автоконвертация #label -> full prompt перед отправкой
+    let processed = input || "";
+    try {
+      const r = /#([\p{L}\p{N} _-]*)$/u;
+      const m = r.exec(processed);
+      if (m) {
+        const typed = (m[1] || "").trim();
+        if (typed.length) {
+          const matchedTitle = hashtagPresets.find(
+            (t) => t.toLowerCase() === typed.toLowerCase(),
+          );
+          if (matchedTitle) {
+            const fullPrompt = hashtagPresetMap[matchedTitle] || matchedTitle;
+            processed = processed.replace(r, fullPrompt);
+          }
+        }
+      }
+    } catch {}
+    const userMessage = processed.trim() || "";
     if (userMessage.length === 0 && files.length === 0) return;
     const fileParts = await Promise.all(
       files.map(async (f) => {
@@ -282,6 +408,34 @@ export default function PromptInput({
       parts.push({ type: "text", text: userMessage });
     }
     parts.push(...fileParts);
+
+    if (imageEnabled) {
+      let providerOptions: any = undefined;
+      try {
+        providerOptions = providerOptionsText.trim()
+          ? JSON.parse(providerOptionsText)
+          : undefined;
+      } catch {}
+
+      sendMessage(
+        { role: "user", parts },
+        {
+          body: {
+            imageSettings: {
+              enabled: true,
+              engine: imageEngine,
+              imageModel: imageModel || undefined,
+              size: imageSize,
+              style: imageStyle,
+              quality: imageQuality,
+              aspectRatio: aspectRatio || undefined,
+              providerOptions,
+            },
+          },
+        },
+      );
+      return;
+    }
 
     sendMessage({ role: "user", parts });
   };
@@ -379,7 +533,7 @@ export default function PromptInput({
               <div className="relative min-h-[2rem]">
                 <ChatMentionInput
                   input={input}
-                  onChange={setInput}
+                  onChange={onInputChanged}
                   onChangeMention={onChangeMention}
                   onEnter={submit}
                   placeholder={placeholder ?? t("placeholder")}
@@ -388,6 +542,28 @@ export default function PromptInput({
                   onFocus={onFocus}
                 />
               </div>
+              {showHashBar && (
+                <div className="px-1 -mt-1">
+                  <ScrollArea className="w-full whitespace-nowrap rounded-md">
+                    <div className="flex w-max space-x-2 py-1 items-center">
+                      <span className="text-xs text-muted-foreground"> </span>
+                      {filteredHashtagPresets.map((title) => (
+                        <button
+                          key={title}
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => replaceHashWithPreset(title)}
+                        >
+                          #{title}
+                        </button>
+                      ))}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </div>
+              )}
+              {/* удалён дублирующий блок старых промптов под полем */}
+
               {files.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-1">
                   {files.map((file, idx) => {
@@ -471,11 +647,77 @@ export default function PromptInput({
                       onSelectAgent={onSelectAgent}
                       mentions={mentions}
                     />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full text-sm text-primary font-semibold ml-1"
+                      onClick={() => {
+                        setShowHashBar((v) => !v);
+                        setHashQuery("");
+                        editorRef.current?.commands.focus();
+                      }}
+                    >
+                      #prompts
+                    </Button>
                   </>
                 )}
 
                 <div className="flex-1" />
 
+                {/* порядок: Image Toggle -> Image Settings -> SelectModel */}
+                {/* 1) Image ON/OFF */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={imageEnabled ? "secondary" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "rounded-full p-2! mr-1",
+                        imageEnabled
+                          ? "bg-primary text-primary-foreground ring-2 ring-primary hover:bg-primary!"
+                          : "bg-transparent text-muted-foreground hover:bg-input!",
+                      )}
+                      aria-pressed={imageEnabled}
+                      onClick={() => setImageEnabled((v) => !v)}
+                    >
+                      <RiImageCircleAiFill
+                        className={cn(
+                          "size-3",
+                          imageEnabled ? "text-primary-foreground" : "text-muted-foreground",
+                        )}
+                      />
+                      <span className={cn("ml-1 text-xs", imageEnabled ? "text-primary-foreground" : "text-muted-foreground")}>Image</span>
+                    </Button>
+                  </TooltipTrigger>
+                  {imageEnabled && (
+                    <TooltipContent>
+                      Генерация картинок — включена
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+                {/* 2) Image Settings */}
+                {imageEnabled && (
+                  <ImageSettingsPanel
+                    chatModel={chatModel || null}
+                    engine={imageEngine}
+                    setEngine={setImageEngine}
+                    size={imageSize}
+                    setSize={setImageSize}
+                    style={imageStyle}
+                    setStyle={setImageStyle}
+                    quality={imageQuality}
+                    setQuality={setImageQuality}
+                    aspectRatio={aspectRatio}
+                    setAspectRatio={setAspectRatio}
+                    providerOptionsText={providerOptionsText}
+                    setProviderOptionsText={setProviderOptionsText}
+                    imageModel={imageModel}
+                    setImageModel={setImageModel}
+                  />
+                )}
+                {/* 3) SelectModel */}
                 <SelectModel onSelect={setChatModel} currentModel={chatModel}>
                   <Button
                     variant={"ghost"}
@@ -500,9 +742,6 @@ export default function PromptInput({
                         >
                           {chatModel.model}
                         </span>
-                        {supportsImageForCurrent && (
-                          <RiImageCircleAiFill className="size-3 opacity-0 group-data-[state=open]:opacity-100 group-hover:opacity-100" />
-                        )}
                       </>
                     ) : (
                       <span className="text-muted-foreground">model</span>
@@ -554,6 +793,7 @@ export default function PromptInput({
                   </div>
                 )}
               </div>
+              {/* удалён нижний список подсказок для image-моделей */}
             </div>
           </div>
         </fieldset>

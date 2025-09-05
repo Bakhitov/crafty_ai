@@ -7,16 +7,19 @@ import {
   Loader,
   Pencil,
   ChevronDownIcon,
+  ChevronLeft,
   ChevronUp,
   RefreshCw,
+  RefreshCcw,
   X,
   Trash2,
   ChevronRight,
   TriangleAlert,
   HammerIcon,
-  EllipsisIcon,
+  Download,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "ui/tooltip";
+import { Dialog, DialogContent } from "ui/dialog";
 import { Button } from "ui/button";
 import { Markdown } from "./markdown";
 import { cn, safeJSONParse, truncateString } from "lib/utils";
@@ -61,6 +64,9 @@ import { notify } from "lib/notify";
 import { ModelProviderIcon } from "ui/model-provider-icon";
 import { appStore } from "@/app/store";
 import { BACKGROUND_COLORS, EMOJI_DATA } from "lib/const";
+import { getStorageManager } from "lib/browser-stroage";
+import { LiaCoinsSolid } from "react-icons/lia";
+import { RiImageCircleAiFill } from "react-icons/ri";
 
 // Helpers to extract image URLs from plain text
 const IMAGE_EXTENSIONS = [
@@ -97,6 +103,94 @@ function extractImageUrls(text: string): string[] {
     urls.add(match[1]);
   }
   return Array.from(urls);
+}
+
+function ImageLightbox({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const filenameFromSrc = (s: string) => {
+    try {
+      if (s.startsWith("data:")) {
+        const mime = s.substring(5, s.indexOf(";"));
+        const ext = mime.split("/")[1] || "png";
+        return `image.${ext}`;
+      }
+      const u = new URL(s);
+      const base = u.pathname.split("/").pop() || "image";
+      return base.includes(".") ? base : `${base}.png`;
+    } catch {
+      return "image.png";
+    }
+  };
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      let dataUrl = src;
+      if (!src.startsWith("data:")) {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Failed to read image"));
+          reader.readAsDataURL(blob);
+        });
+      }
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filenameFromSrc(src);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err: any) {
+      toast.error(String(err?.message || "Failed to download image"));
+    }
+  };
+
+  return (
+    <div className={cn("relative inline-block group", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt || "image"}
+        className={cn("cursor-zoom-in", className)}
+        onClick={() => setOpen(true)}
+      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute top-1 right-1 h-7 w-7 p-0 opacity-0 group-hover:opacity-100"
+            onClick={handleDownload}
+          >
+            <Download className="size-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Download</TooltipContent>
+      </Tooltip>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[90vw] p-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt || "image"}
+            className="w-auto h-auto max-w-[90vw] max-h-[90vh] rounded-md"
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 type MessagePart = UIMessage["parts"][number];
@@ -229,12 +323,11 @@ export const UserMessagePart = memo(
           {imageUrls.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {imageUrls.map((src, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <ImageLightbox
                   key={`${message.id}-img-${i}`}
                   src={src}
                   alt="image"
-                  className="max-h-48 rounded-md border bg-background"
+                  className="max-h-96 md:max-h-[28rem] rounded-md border bg-background"
                 />
               ))}
             </div>
@@ -335,14 +428,68 @@ export const AssistMessagePart = memo(function AssistMessagePart({
   threadId,
   setMessages,
   sendMessage,
+  isLoading,
 }: AssistMessagePartProps) {
   const { copied, copy } = useCopy();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isRetryLoading, setIsRetryLoading] = useState(false);
   const agentList = appStore((state) => state.agentList);
   const [isDeleting, setIsDeleting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const metadata = message.metadata as ChatMetadata | undefined;
-  const imageUrls = useMemo(() => extractImageUrls(part.text), [part.text]);
+  // Branch state (per previous user message)
+  const branchKey = prevMessage?.id || "";
+  const branchStorage = useMemo(() => getStorageManager("BRANCHES"), []);
+  const imagePrefStorage = useMemo(() => getStorageManager("IMAGE_PREFS"), []);
+  const [branchIndex, setBranchIndex] = useState<number>(0);
+  const [branchVariants, setBranchVariants] = useState<string[]>([]);
+
+  // Initialize/merge current variant into storage and local state
+  useEffect(() => {
+    // Не фиксируем варианты во время стриминга — иначе каждый текстовый дельта станет отдельной "веткой"
+    if (isLoading) return;
+    try {
+      const raw = (branchStorage.get() as any) || {};
+      const entry = raw[branchKey] || { variants: [], index: 0 };
+      let variants: string[] = Array.isArray(entry.variants)
+        ? [...entry.variants]
+        : [];
+      const current = part.text || "";
+      let appended = false;
+      if (variants.length === 0) {
+        variants = [current];
+        appended = true;
+      } else if (variants[variants.length - 1] !== current) {
+        variants = [...variants, current];
+        appended = true;
+      }
+      const index = appended
+        ? variants.length - 1 // при появлении нового варианта показываем его сразу
+        : Math.min(entry.index ?? variants.length - 1, variants.length - 1);
+      raw[branchKey] = { variants, index };
+      branchStorage.set(raw);
+      setBranchVariants(variants);
+      setBranchIndex(index);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchKey, part.text, isLoading]);
+
+  const displayedText = useMemo(() => {
+    return branchVariants[branchIndex] ?? part.text;
+  }, [branchVariants, branchIndex, part.text]);
+
+  const imageUrls = useMemo(() => extractImageUrls(displayedText), [displayedText]);
+  const firstDataUrl = useMemo(() => {
+    // Prefer a data URL to render via AIImage; fall back to plain <img>
+    return imageUrls.find((u) => u.startsWith("data:image/"));
+  }, [imageUrls]);
+  const hasImageFilePart = useMemo(() => {
+    try {
+      return (message?.parts || []).some((p: any) => p?.type === "file" && typeof p?.mediaType === "string" && p.mediaType.toLowerCase().startsWith("image/"));
+    } catch {
+      return false;
+    }
+  }, [message?.parts]);
+  const isImageReply = useMemo(() => Boolean(firstDataUrl) || hasImageFilePart, [firstDataUrl, hasImageFilePart]);
 
   const agent = useMemo(() => {
     return agentList.find((a) => a.id === metadata?.agentId);
@@ -370,11 +517,12 @@ export const AssistMessagePart = memo(function AssistMessagePart({
       .unwrap();
   }, [message.id]);
 
-  const handleModelChange = (model: ChatModel) => {
-    safe(() => setIsLoading(true))
+  const handleRetry = useCallback(() => {
+    // Повторить последний запрос пользователя перед этим ответом
+    safe(() => setIsRetryLoading(true))
       .ifOk(() =>
         threadId
-          ? deleteMessagesByChatIdAfterTimestampAction(message.id)
+          ? deleteMessagesByChatIdAfterTimestampAction(prevMessage.id)
           : Promise.resolve(),
       )
       .ifOk(() =>
@@ -387,21 +535,103 @@ export const AssistMessagePart = memo(function AssistMessagePart({
         }),
       )
       .ifOk(() =>
-        sendMessage(prevMessage, {
-          body: {
-            model,
-          },
+        {
+          if (isImageReply) {
+            // Попробовать вспомнить последнюю картинную модель для этого треда
+            const saved = (() => {
+              try {
+                const raw = (imagePrefStorage.get() as any) || {};
+                return raw[threadId || ""] as { provider?: string; imageModel?: string } | undefined;
+              } catch {
+                return undefined;
+              }
+            })();
+            const provider = saved?.provider || metadata?.chatModel?.provider || "auto";
+            const defaultImageModelByProvider: Record<string, string> = {
+              openai: "gpt-image-1",
+              google: "imagen-3.0-generate-002",
+              fal: "fal-ai/flux/dev",
+              luma: "photon-1",
+              replicate: "black-forest-labs/flux-schnell",
+            };
+            const defaultImageModel = saved?.imageModel || defaultImageModelByProvider[provider] || "gpt-image-1";
+            return sendMessage(prevMessage, {
+              body: {
+                imageSettings: {
+                  enabled: true,
+                  engine: provider,
+                  imageModel: defaultImageModel,
+                },
+              },
+            });
+          }
+          return sendMessage(prevMessage, {
+            body: metadata?.chatModel ? { model: metadata.chatModel } : undefined,
+          });
+        },
+      )
+      .ifFail((error) => toast.error((error as Error).message))
+      .watch(() => setIsRetryLoading(false))
+      .unwrap();
+  }, [prevMessage, metadata?.chatModel, threadId, message.id]);
+
+  // removed old text+media download function; download is available per-image only
+
+  const handleModelChange = (model: ChatModel) => {
+    // Перегенерируем предыдущий запрос пользователя с новой моделью
+    safe(() => setIsRetryLoading(true))
+      .ifOk(() =>
+        threadId
+          ? deleteMessagesByChatIdAfterTimestampAction(prevMessage.id)
+          : Promise.resolve(),
+      )
+      .ifOk(() =>
+        setMessages((messages) => {
+          const index = messages.findIndex((m) => m.id === prevMessage.id);
+          if (index !== -1) {
+            return [...messages.slice(0, index)];
+          }
+          return messages;
         }),
       )
+      .ifOk(() =>
+        {
+          if (isImageReply) {
+            const provider = model.provider || "auto";
+            // используем выбранную модель как imageModel, если это image‑совместимая строка
+            const imageModel = model.model;
+            // Запомнить выбор для треда
+            try {
+              const raw = (imagePrefStorage.get() as any) || {};
+              raw[threadId || ""] = { provider, imageModel };
+              imagePrefStorage.set(raw);
+            } catch {}
+            return sendMessage(prevMessage, {
+              body: {
+                imageSettings: {
+                  enabled: true,
+                  engine: provider,
+                  imageModel,
+                },
+              },
+            });
+          }
+          return sendMessage(prevMessage, {
+            body: {
+              model,
+            },
+          });
+        },
+      )
       .ifFail((error) => toast.error(error.message))
-      .watch(() => setIsLoading(false))
+      .watch(() => setIsRetryLoading(false))
       .unwrap();
   };
 
   return (
     <div
       className={cn(
-        isLoading && "animate-pulse",
+        (isLoading || isRetryLoading) && "animate-pulse",
         "flex flex-col gap-2 group/message",
       )}
     >
@@ -411,23 +641,81 @@ export const AssistMessagePart = memo(function AssistMessagePart({
           "opacity-50 border border-destructive bg-card rounded-lg": isError,
         })}
       >
-        <Markdown>{part.text}</Markdown>
-        {imageUrls.length > 0 && (
+        <Markdown>{displayedText}</Markdown>
+        {firstDataUrl ? (
+          <div className="flex flex-wrap gap-2 mt-1">
+            <ImageLightbox
+              src={firstDataUrl}
+              alt="image"
+              className="max-h-112 md:max-h-[32rem] rounded-md border bg-background"
+            />
+          </div>
+        ) : imageUrls.length > 0 ? (
           <div className="flex flex-wrap gap-2 mt-1">
             {imageUrls.map((src, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <ImageLightbox
                 key={`${message.id}-assist-img-${i}`}
                 src={src}
                 alt="image"
-                className="max-h-56 rounded-md border bg-background"
+                className="max-h-112 md:max-h-[32rem] rounded-md border bg-background"
               />
             ))}
           </div>
-        )}
+        ) : null}
       </div>
       {showActions && (
-        <div className="flex w-full">
+        <div className="flex w-full items-center gap-1 opacity-0 group-hover/message:opacity-100 transition-opacity duration-300">
+          {branchVariants.length > 1 && (
+            <div className="mr-1 flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-3! p-4!"
+                    disabled={branchIndex <= 0}
+                    onClick={() => {
+                      const raw = (branchStorage.get() as any) || {};
+                      const entry = raw[branchKey] || { variants: [], index: 0 };
+                      const prevIndex = Math.max(0, (entry.index ?? 0) - 1);
+                      raw[branchKey] = { variants: entry.variants || [], index: prevIndex };
+                      branchStorage.set(raw);
+                      setBranchIndex(prevIndex);
+                    }}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Previous</TooltipContent>
+              </Tooltip>
+              <span className="text-[11px] text-muted-foreground min-w-10 text-center">
+                {branchIndex + 1} / {branchVariants.length}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-3! p-4!"
+                    onClick={() => {
+                      const raw = (branchStorage.get() as any) || {};
+                      const entry = raw[branchKey] || { variants: [], index: 0 };
+                      const last = Math.max(0, (entry.variants?.length || 1) - 1);
+                      const nextIndex = Math.min((entry.index ?? 0) + 1, last);
+                      raw[branchKey] = { variants: entry.variants || [], index: nextIndex };
+                      branchStorage.set(raw);
+                      setBranchIndex(nextIndex);
+                    }}
+                    disabled={branchIndex >= Math.max(0, (branchVariants.length || 1) - 1)}
+                  >
+                    <ChevronRight />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Next</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
+          {/* Убрали UI веток, т.к. страница одна. Оставляем только действия: Copy / Change Model / Retry / Delete */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -445,20 +733,43 @@ export const AssistMessagePart = memo(function AssistMessagePart({
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
-                <SelectModel onSelect={handleModelChange}>
+                <SelectModel onSelect={handleModelChange} mode={isImageReply ? "image" : "text"}>
                   <Button
                     data-testid="message-edit-button data-[state=open]:bg-secondary!"
                     variant="ghost"
                     size="icon"
                     className="size-3! p-4!"
                   >
-                    {<RefreshCw />}
+                    {metadata?.chatModel?.provider ? (
+                      <ModelProviderIcon
+                        provider={metadata.chatModel.provider}
+                        className="size-4"
+                      />
+                    ) : firstDataUrl ? (
+                      <RiImageCircleAiFill className="size-4" />
+                    ) : (
+                      <RefreshCw />
+                    )}
                   </Button>
                 </SelectModel>
               </div>
             </TooltipTrigger>
             <TooltipContent>Change Model</TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-3! p-4!"
+                onClick={handleRetry}
+              >
+                <RefreshCcw />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Retry</TooltipContent>
+          </Tooltip>
+          {/* Убрали общий Download для текста — остаётся только Copy. Скачивание доступно на превью изображений. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -483,7 +794,7 @@ export const AssistMessagePart = memo(function AssistMessagePart({
                   size="icon"
                   className="size-3! p-4! opacity-0 group-hover/message:opacity-100 transition-opacity duration-300"
                 >
-                  <EllipsisIcon />
+                  <LiaCoinsSolid />
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="p-4 w-72 bg-card border shadow-lg">
@@ -556,6 +867,7 @@ export const AssistMessagePart = memo(function AssistMessagePart({
                     <>
                       <div className="flex flex-col gap-2">
                         <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          <LiaCoinsSolid className="size-4" />
                           Token Usage
                           <span className="text-xs text-muted-foreground font-normal">
                             {

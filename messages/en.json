@@ -295,7 +295,12 @@
       "apiKeysDescription": "Manage your per-user provider API keys and optional base URL.",
       "existingKeys": "Existing Keys",
       "noKeys": "No keys yet",
-      "baseUrlHint": "Optional. Override default provider endpoint."
+      "baseUrlHint": "Optional. Override default provider endpoint.",
+      "aiGatewayHint": "Use AI Gateway key",
+      "openrouterHint": "Use OpenRouter key",
+      "priorityRouting": "Сommon provider LLM",
+      "priorityRoutingDesc": "Select whose keys will be used"
+
     },
     "MissingKeys": {
       "title": "Missing API key",

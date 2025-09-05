@@ -45,8 +45,10 @@ export async function POST(request: Request) {
   const body = await request.json();
   const parsed = setKeyBody.parse(body);
   const { provider, key, label, scopes, expiresAt, baseUrl } = parsed;
+  const keyTrimmed = key.trim();
+  const baseUrlTrimmed = baseUrl?.trim();
 
-  const enc = KeyCrypto.encrypt(key);
+  const enc = KeyCrypto.encrypt(keyTrimmed);
   const apiKeys = (await userSecretRepo.getApiKeys(session.user.id)) || {};
   const nowIso = new Date().toISOString();
   const entry: ApiKeyEncrypted = {
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
     label: label ?? null,
     scopes,
     expiresAt: expiresAt ?? null,
-    baseUrl: baseUrl ?? null,
+    baseUrl: baseUrlTrimmed ?? null,
     isActive: true,
     createdAt: nowIso,
     lastUsedAt: null,

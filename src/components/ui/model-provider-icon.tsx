@@ -16,6 +16,8 @@ export function ModelProviderIcon({
     <ClaudeIcon className={className} />
   ) : provider === "google" ? (
     <GeminiIcon className={className} />
+  ) : provider === "gateway" ? (
+    <BlendIcon className={className} />
   ) : (
     <BlendIcon className={className} />
   );

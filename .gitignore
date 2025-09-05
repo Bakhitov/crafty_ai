@@ -17,6 +17,7 @@ test-results/
 playwright-report/
 .env.test
 
+
 # next.js
 /.next/
 /out/
@@ -28,6 +29,7 @@ playwright-report/
 .DS_Store
 *.pem
 *.local.*
+exampleVerselAISDK/*
 
 # debug
 npm-debug.log*
